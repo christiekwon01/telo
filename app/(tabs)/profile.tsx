@@ -20,15 +20,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
+import { RovaIntelligenceDevTools } from '@/components/RovaIntelligenceDevTools';
 import { StatusAreaFade } from '@/components/status-area-fade';
 import { TabHeader } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sessionQueryKeys, useActiveAthlete } from '@/hooks/useSessionData';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
 import { resetOnboardingCompletion } from '@/lib/onboarding-completion';
-import { generateWeeklyChallenges } from '@/services/generateWeeklyChallenges';
-import { saveChallenges } from '@/services/saveChallenges';
-import { assignTemplatePlan } from '@/services/assignTemplatePlan';
 import {
   getAppleCalendarSubscriptionState,
   getAppleCalendarPrefs as loadApplePrefs,
@@ -68,21 +66,7 @@ export default function ProfileScreen() {
   const [runBackgroundDraft, setRunBackgroundDraft] = useState<SportBackground>('beginner');
   const [isSavingLevel, setIsSavingLevel] = useState(false);
   const [levelSaveError, setLevelSaveError] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isUpdatingTemplatePlan, setIsUpdatingTemplatePlan] = useState(false);
-  const [isLoadingFlexHistory, setIsLoadingFlexHistory] = useState(false);
-  const [flexRows, setFlexRows] = useState<
-    {
-      id: string;
-      created_at: string;
-      reason: string;
-      moved_count: number;
-      dropped_count: number;
-      reason_detail: string | null;
-      reshuffled_snapshot: unknown;
-    }[]
-  >([]);
-  const [selectedFlexRow, setSelectedFlexRow] = useState<(typeof flexRows)[number] | null>(null);
+  const [rovaDevOpen, setRovaDevOpen] = useState(false);
   const [huaweiConnected, setHuaweiConnected] = useState(false);
   const [applePrefs, setApplePrefs] = useState<Awaited<ReturnType<typeof loadApplePrefs>> | null>(null);
   const [appleSubscriptionConfigured, setAppleSubscriptionConfigured] = useState(false);
@@ -223,91 +207,6 @@ export default function ProfileScreen() {
     if (themeId === 'burgundyChampagne') return 'Burgundy + Champagne';
     if (themeId === 'obsidianIce') return 'Obsidian + Ice';
     return 'Slate + Citrus';
-  };
-
-  const handleGenerateChallenges = async () => {
-    if (!athlete?.id) {
-      Alert.alert('No athlete found', 'Create an athlete first from onboarding.');
-      return;
-    }
-    setIsGenerating(true);
-    try {
-      const generated = await generateWeeklyChallenges(athlete.id);
-      const savedCount = await saveChallenges(athlete.id, generated);
-      await queryClient.invalidateQueries({ queryKey: ['rova_challenges'] });
-      showToast(`Saved ${savedCount} pending Rova challenge${savedCount === 1 ? '' : 's'} ✨`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      Alert.alert('Failed to generate challenges', message);
-      console.error('[Profile] Generate Rova challenges failed:', message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleUpdateTemplatePlan = async () => {
-    if (!athlete?.id) {
-      Alert.alert('No athlete profile', 'Please complete onboarding first.');
-      return;
-    }
-    setIsUpdatingTemplatePlan(true);
-    try {
-      const raceDate = athlete.goal_race_date ?? new Date(Date.now() + 12 * 7 * 86_400_000).toISOString().slice(0, 10);
-      const raceName = athlete.goal_race_name?.trim() || 'Goal race';
-      const { data: currentSessions, error } = await supabase
-        .from('sessions')
-        .select('scheduled_date')
-        .eq('athlete_id', athlete.id)
-        .eq('status', 'planned')
-        .order('scheduled_date', { ascending: true })
-        .limit(84);
-      if (error) throw new Error(error.message);
-      const daySet = new Set<string>();
-      for (const row of currentSessions ?? []) {
-        const day = new Date(`${row.scheduled_date}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'short' });
-        daySet.add(day);
-      }
-      const trainingDays = daySet.size > 0 ? Array.from(daySet) : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      await assignTemplatePlan({
-        athleteId: athlete.id,
-        level: (athlete.level as AthleteLevel | undefined) ?? 'fara',
-        raceDate,
-        raceName,
-        trainingDays,
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['sessions'] }),
-        queryClient.invalidateQueries({ queryKey: ['plan'] }),
-      ]);
-      Alert.alert('Plan updated', 'Your template plan has been re-applied. You can edit it in Plan.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      Alert.alert('Could not update plan', message);
-    } finally {
-      setIsUpdatingTemplatePlan(false);
-    }
-  };
-
-  const handleLoadFlexHistory = async () => {
-    if (!athlete?.id) {
-      Alert.alert('No athlete found', 'Create an athlete first from onboarding.');
-      return;
-    }
-    setIsLoadingFlexHistory(true);
-    try {
-      const { data, error } = await supabase
-        .from('flex_history')
-        .select('id,created_at,reason,moved_count,dropped_count,reason_detail,reshuffled_snapshot')
-        .eq('athlete_id', athlete.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (error) throw new Error(error.message);
-      setFlexRows(data ?? []);
-    } catch (error) {
-      Alert.alert('Failed to load flex history', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setIsLoadingFlexHistory(false);
-    }
   };
 
   const handleDataExport = async (format: 'json' | 'csv') => {
@@ -466,10 +365,10 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </View>
           </Pressable>
-          <Pressable style={styles.row} disabled={isUpdatingTemplatePlan} onPress={() => void handleUpdateTemplatePlan()}>
+          <Pressable style={styles.row} onPress={() => router.push('/template-plan')}>
             <Text style={styles.rowLabel}>Template plan</Text>
             <View style={styles.goalRaceValueWrap}>
-              <Text style={styles.rowValue}>{isUpdatingTemplatePlan ? 'Updating...' : 'Re-apply template'}</Text>
+              <Text style={styles.rowValue}>Edit & apply</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </View>
           </Pressable>
@@ -482,23 +381,9 @@ export default function ProfileScreen() {
         {__DEV__ ? (
           <View style={styles.card}>
             <Text style={styles.devLabel}>Dev tools</Text>
-            <Pressable style={styles.devButton} disabled={isGenerating} onPress={() => void handleGenerateChallenges()}>
-              <Text style={styles.devButtonText}>{isGenerating ? 'Generating...' : 'Generate Rova challenges'}</Text>
+            <Pressable style={styles.devButton} onPress={() => setRovaDevOpen(true)}>
+              <Text style={styles.devButtonText}>Rova intelligence (challenges, chat, flex…)</Text>
             </Pressable>
-            <Pressable style={styles.devButton} onPress={() => void handleLoadFlexHistory()}>
-              <Text style={styles.devButtonText}>{isLoadingFlexHistory ? 'Loading...' : 'View flex history'}</Text>
-            </Pressable>
-            {flexRows.map((row) => (
-              <Pressable key={row.id} style={styles.historyRow} onPress={() => setSelectedFlexRow(row)}>
-                <View style={styles.challengeRowBody}>
-                  <Text style={styles.challengeTitle}>
-                    {new Date(row.created_at).toLocaleDateString('en-AU')} · {row.reason}
-                  </Text>
-                  <Text style={styles.challengeMeta}>{row.moved_count} moved · {row.dropped_count} dropped</Text>
-                </View>
-                <Text style={styles.challengeStatus}>View</Text>
-              </Pressable>
-            ))}
           </View>
         ) : null}
 
@@ -597,31 +482,13 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-      <Modal
-        transparent
-        visible={__DEV__ && Boolean(selectedFlexRow)}
-        animationType="fade"
-        onRequestClose={() => setSelectedFlexRow(null)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.modalOverlay} onPress={() => setSelectedFlexRow(null)} />
-          <View style={styles.modalCard}>
-            <Pressable style={styles.modalCloseButton} onPress={() => setSelectedFlexRow(null)} hitSlop={8}>
-              <Ionicons name="close" size={16} color={theme.primary} />
-            </Pressable>
-            <Text style={styles.modalTitle}>Flex details</Text>
-            <Text style={styles.modalBody}>Reason: {selectedFlexRow?.reason}</Text>
-            <Text style={styles.modalBody}>Details: {selectedFlexRow?.reason_detail ?? '—'}</Text>
-            <Text style={styles.modalBody}>Moved: {selectedFlexRow?.moved_count ?? 0}</Text>
-            <Text style={styles.modalBody}>Dropped: {selectedFlexRow?.dropped_count ?? 0}</Text>
-            <Text style={styles.challengeMeta} numberOfLines={6}>
-              Snapshot: {JSON.stringify(selectedFlexRow?.reshuffled_snapshot ?? {})}
-            </Text>
-            <Pressable style={styles.modalAction} onPress={() => setSelectedFlexRow(null)}>
-              <Text style={styles.modalActionText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      {__DEV__ ? (
+        <RovaIntelligenceDevTools
+          visible={rovaDevOpen}
+          onClose={() => setRovaDevOpen(false)}
+          athleteId={athlete?.id}
+        />
+      ) : null}
       <FloatingPillNav active="profile" />
     </SafeAreaView>
   );
@@ -771,48 +638,17 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     borderRadius: 999,
     borderWidth: 1,
     borderColor: theme.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: 'transparent',
-    marginBottom: 8,
-    alignSelf: 'flex-start',
+    marginBottom: 0,
+    alignSelf: 'stretch',
   },
   devButtonText: {
     fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: theme.primary,
-  },
-  historyRow: {
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 10,
-    backgroundColor: theme.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  challengeRowBody: {
-    flex: 1,
-  },
-  challengeTitle: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 12,
-    color: theme.primary,
-  },
-  challengeMeta: {
-    marginTop: 2,
-    fontFamily: 'DMSans-Regular',
-    fontSize: 11,
-    color: theme.textMuted,
-  },
-  challengeStatus: {
-    fontFamily: 'DMSans-SemiBold',
-    fontSize: 10,
-    color: theme.accent,
-    textTransform: 'uppercase',
+    textAlign: 'center',
   },
   logoutButton: {
     marginTop: 8,
@@ -828,11 +664,6 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     fontFamily: 'DMSans-SemiBold',
     fontSize: 14,
     color: theme.primary,
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
   },
   levelModalRoot: {
     flex: 1,

@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { saveAthleteId } from '@/lib/athlete-session';
+import { datePickerMondayWeekProps, toLocalIsoDate } from '@/lib/dates';
 import { markOnboardingComplete } from '@/lib/onboarding-completion';
 import { ensureSupabaseAuthUser } from '@/lib/supabase-auth';
 import { supabase } from '@/lib/supabase';
@@ -110,7 +111,7 @@ export default function OnboardingScreen() {
       const normalizedTrainingDays = trainingDays.map((day) => day.toLowerCase().slice(0, 3));
 
       const athleteNameValue = athleteName.trim() || 'Athlete';
-      const raceDateValue = raceDate || new Date().toISOString().slice(0, 10);
+      const raceDateValue = raceDate || toLocalIsoDate(new Date());
       const raceNameValue = raceName.trim() || 'Goal race';
 
       const { id: authUserId } = await ensureSupabaseAuthUser();
@@ -334,6 +335,7 @@ export default function OnboardingScreen() {
             </Pressable>
             {showDatePicker ? (
               <DateTimePicker
+                {...datePickerMondayWeekProps()}
                 value={raceDate ? new Date(raceDate) : new Date()}
                 mode="date"
                 display="spinner"
@@ -343,7 +345,7 @@ export default function OnboardingScreen() {
                     setShowDatePicker(false);
                   }
                   if (selectedDate) {
-                    setRaceDate(selectedDate.toISOString().split('T')[0]);
+                    setRaceDate(toLocalIsoDate(selectedDate));
                   }
                 }}
               />
@@ -458,7 +460,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   skipText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     color: '#C97E2F',
     fontSize: 14,
   },
@@ -498,7 +500,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtext: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     color: 'rgba(15,40,64,0.4)',
     textAlign: 'center',
@@ -519,17 +521,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     minHeight: 52,
     justifyContent: 'center',
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     color: '#0F2840',
     fontSize: 16,
   },
   inputText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 16,
     color: '#0F2840',
   },
   placeholderText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 16,
     color: 'rgba(15,40,64,0.35)',
   },
@@ -565,7 +567,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   levelCardText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     color: 'rgba(15,40,64,0.5)',
   },
@@ -577,7 +579,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   sportBackgroundLabel: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#0F2840',
     textTransform: 'capitalize',
@@ -599,7 +601,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F3EE',
   },
   sportBackgroundChipText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 11,
     color: '#0F2840',
   },
@@ -625,7 +627,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F2840',
   },
   dayBtnText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#0F2840',
   },
@@ -634,12 +636,12 @@ const styles = StyleSheet.create({
   },
   subtleCopy: {
     marginTop: 12,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     color: 'rgba(15,40,64,0.4)',
   },
   bodyCopy: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     color: 'rgba(15,40,64,0.5)',
     marginBottom: 10,
@@ -667,7 +669,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   toggleText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 14,
     lineHeight: 20,
     color: '#0F2840',
@@ -728,7 +730,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   loadingMessage: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 13,
     color: 'rgba(15,40,64,0.72)',
     textAlign: 'center',
@@ -747,7 +749,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   errorBannerText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 12,
     color: '#0F2840',
   },
@@ -759,7 +761,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   retryButtonText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#FFFFFF',
   },
@@ -771,7 +773,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryButtonText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 16,
     color: '#FFFFFF',
   },

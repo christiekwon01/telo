@@ -94,6 +94,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="SessionDetail" options={{ headerShown: false }} />
         <Stack.Screen name="goal-races" options={{ headerShown: false }} />
+        <Stack.Screen name="template-plan" options={{ headerShown: false }} />
         <Stack.Screen name="apple-calendar" options={{ headerShown: false }} />
         <Stack.Screen name="huawei-health" options={{ headerShown: false }} />
         <Stack.Screen name="progress-history" options={{ headerShown: false }} />

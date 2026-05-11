@@ -22,6 +22,7 @@ import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sessionQueryKeys, useActiveAthlete, useRaceGoals } from '@/hooks/useSessionData';
 import { ensureAthleteRowExists, ensureSupabaseAuthUser } from '@/lib/supabase-auth';
+import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 
 type GoalForm = {
@@ -355,6 +356,7 @@ export default function GoalRacesScreen() {
 
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
+        ...datePickerAndroidMondayOpenProps(),
         value: pickerValue,
         mode: 'date',
         onChange: (event, selectedDate) => {
@@ -668,6 +670,7 @@ export default function GoalRacesScreen() {
                         ))}
                       </View>
                       <DateTimePicker
+                        {...datePickerMondayWeekProps()}
                         value={iosPickerDate}
                         mode="date"
                         display="inline"

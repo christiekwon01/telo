@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { datePickerMondayWeekProps } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 import { withAlpha } from '@/lib/theme-utils';
 import { getSportIcon } from '@/components/sport-icon';
@@ -534,6 +535,7 @@ export function ImportPlanSheet({
                 </Pressable>
                 {showDatePicker ? (
                   <DateTimePicker
+                    {...datePickerMondayWeekProps()}
                     value={new Date(`${manualDate}T00:00:00`)}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}

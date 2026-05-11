@@ -5,7 +5,8 @@ import { useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useCompletedSessionLogs } from '@/hooks/useSessionData';
+import { useActiveAthlete, useCompletedSessionLogs } from '@/hooks/useSessionData';
+import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps } from '@/lib/dates';
 import { withAlpha } from '@/lib/theme-utils';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -39,6 +40,7 @@ export default function ProgressHistoryScreen() {
     const value = new Date(`${currentIso}T00:00:00`);
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
+        ...datePickerAndroidMondayOpenProps(),
         value,
         mode: 'date',
         onChange: (_e, selected) => {
@@ -65,7 +67,9 @@ export default function ProgressHistoryScreen() {
       year: 'numeric',
     });
 
+  const { data: athlete } = useActiveAthlete();
   const { data: logs = [], isLoading } = useCompletedSessionLogs({
+    athleteId: athlete?.id,
     fromIso,
     toIso,
     trainingType: sessionType,
@@ -141,6 +145,7 @@ export default function ProgressHistoryScreen() {
           <Pressable style={styles.modalBackdrop} onPress={() => setPickerField(null)} />
           <View style={styles.datePickerCard}>
             <DateTimePicker
+              {...datePickerMondayWeekProps()}
               value={new Date(`${(pickerField === 'from' ? fromIso : toIso)}T00:00:00`)}
               mode="date"
               display="inline"
@@ -185,7 +190,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       paddingVertical: 7,
       backgroundColor: theme.surface,
     },
-    backButtonText: { fontFamily: 'DMSans_500Medium', color: theme.primary, fontSize: 12 },
+    backButtonText: { fontFamily: 'DMSans-Medium', color: theme.primary, fontSize: 12 },
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -195,7 +200,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     },
     heading: { fontFamily: 'CormorantGaramond_700Bold', fontSize: 34, color: theme.primary },
     subHeading: {
-      fontFamily: 'DMSans_400Regular',
+      fontFamily: 'DMSans-Regular',
       fontSize: 13,
       color: theme.textMuted,
       marginTop: -2,
@@ -216,14 +221,14 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       gap: 2,
     },
     dateButtonLabel: {
-      fontFamily: 'DMSans_500Medium',
+      fontFamily: 'DMSans-Medium',
       fontSize: 11,
       color: theme.textMuted,
       textTransform: 'uppercase',
       letterSpacing: 0.4,
     },
     dateButtonValue: {
-      fontFamily: 'DMSans_500Medium',
+      fontFamily: 'DMSans-Medium',
       fontSize: 13,
       color: theme.text,
     },
@@ -247,7 +252,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       backgroundColor: theme.surface,
     },
     segmentText: {
-      fontFamily: 'DMSans_500Medium',
+      fontFamily: 'DMSans-Medium',
       fontSize: 12,
       color: theme.textMuted,
     },
@@ -255,7 +260,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       color: theme.text,
     },
     helperText: {
-      fontFamily: 'DMSans_400Regular',
+      fontFamily: 'DMSans-Regular',
       fontSize: 12,
       color: theme.textMuted,
     },
@@ -268,12 +273,12 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       gap: 4,
     },
     emptyTitle: {
-      fontFamily: 'DMSans_600SemiBold',
+      fontFamily: 'DMSans-SemiBold',
       fontSize: 14,
       color: theme.primary,
     },
     emptyBody: {
-      fontFamily: 'DMSans_400Regular',
+      fontFamily: 'DMSans-Regular',
       fontSize: 12,
       color: theme.textMuted,
     },
@@ -292,8 +297,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       gap: 8,
     },
     historyCardBody: { flex: 1, gap: 2 },
-    historyTitle: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: theme.primary },
-    historyMeta: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted },
+    historyTitle: { fontFamily: 'DMSans-SemiBold', fontSize: 14, color: theme.primary },
+    historyMeta: { fontFamily: 'DMSans-Regular', fontSize: 12, color: theme.textMuted },
     modalRoot: {
       flex: 1,
       justifyContent: 'center',
@@ -323,7 +328,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       backgroundColor: theme.primary,
     },
     doneButtonText: {
-      fontFamily: 'DMSans_500Medium',
+      fontFamily: 'DMSans-Medium',
       fontSize: 12,
       color: theme.onPrimary,
     },

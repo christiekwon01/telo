@@ -29,6 +29,7 @@ import {
 } from '@/services/racePriority';
 import { usePlanAdjustmentStore } from '@/store/plan-adjustment-store';
 import { supabase } from '@/lib/supabase';
+import { datePickerMondayWeekProps, mondayBasedMonthLeadingDayCount } from '@/lib/dates';
 
 type SessionStatus = 'planned' | 'completed' | 'skipped';
 type SessionDotStatus = 'planned' | 'completed';
@@ -71,7 +72,7 @@ type DayBucketLayout = {
   height: number;
 };
 
-const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 function toIsoDate(value: Date) {
   const year = value.getFullYear();
@@ -80,10 +81,17 @@ function toIsoDate(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
+/** Normalize `race_goals.event_date` from DB (`date` or timestamptz string) to `YYYY-MM-DD` for calendar keys. */
+function raceGoalCalendarDateKey(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
 function getMonthGrid(anchor: Date): DayCell[] {
   const startOfMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const dayCount = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate();
-  const leading = startOfMonth.getDay();
+  const leading = mondayBasedMonthLeadingDayCount(startOfMonth);
   const cells: DayCell[] = [];
 
   for (let i = 0; i < leading; i += 1) {
@@ -191,48 +199,35 @@ function SessionMarkerRow({
   challengeStatus?: ChallengeStarStatus;
 }) {
   const { theme } = useTheme();
-  if (raceMarker) {
-    return (
-      <View style={styles.markerRow}>
-        {raceMarker === 'c_dot' ? (
-          <View style={[styles.racePriorityDot, { backgroundColor: '#B16C3D' }]} />
-        ) : (
-          <Ionicons
-            name="flag"
-            size={10}
-            color={raceMarker === 'a_flag' ? '#C97E2F' : '#B0B7C3'}
-          />
-        )}
-        {challengeStatus ? (
-          <Text
-            style={[
-              styles.challengeStar,
-              { color: theme.accent },
-              challengeStatus === 'accepted' ? styles.challengeStarAccepted : null,
-              challengeStatus === 'accepted' ? { color: withAlpha(theme.accent, 0.45) } : null,
-            ]}>
-            ★
-          </Text>
-        ) : null}
-      </View>
-    );
-  }
-  if (dots.length === 0) {
+  const showRace = Boolean(raceMarker);
+  const showDots = dots.length > 0;
+  const showOverflow = dots.length > 3;
+  const visibleDots = dots.slice(0, 3);
+
+  if (!showRace && !showDots && !challengeStatus) {
     return <View style={styles.markerRow} />;
   }
-  const showOverflow = dots.length > 3;
-  const visible = dots.slice(0, 3);
+
   return (
     <View style={styles.markerRow}>
-      {visible.map((status, index) => (
-        <View
-          key={`${status}-${index}`}
-          style={[
-            status === 'planned' ? styles.dayDotPlanned : styles.dayDotCompleted,
-            status === 'planned' ? { backgroundColor: theme.primary } : { backgroundColor: theme.accent },
-          ]}
-        />
-      ))}
+      {showRace ? (
+        raceMarker === 'c_dot' ? (
+          <View style={[styles.racePriorityDot, { backgroundColor: '#B16C3D' }]} />
+        ) : (
+          <Ionicons name="flag" size={10} color={raceMarker === 'a_flag' ? '#C97E2F' : '#B0B7C3'} />
+        )
+      ) : null}
+      {showDots
+        ? visibleDots.map((status, index) => (
+            <View
+              key={`${status}-${index}`}
+              style={[
+                status === 'planned' ? styles.dayDotPlanned : styles.dayDotCompleted,
+                status === 'planned' ? { backgroundColor: theme.primary } : { backgroundColor: theme.accent },
+              ]}
+            />
+          ))
+        : null}
       {showOverflow ? (
         <Text style={[styles.dotOverflowText, { color: theme.text }]} allowFontScaling={false}>
           3+
@@ -428,26 +423,29 @@ export default function PlanScreen() {
 
   const refreshRaces = useCallback(async () => {
     setRaceLoading(true);
-    const fromDate = toIsoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1));
-    const toDate = toIsoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 0));
-    const challengeResult = athlete?.id
-      ? await supabase
-          .from('rova_challenges')
-          .select('scheduled_date,status')
-          .eq('athlete_id', athlete.id)
-          .gte('scheduled_date', fromDate)
-          .lte('scheduled_date', toDate)
-          .in('status', ['pending', 'accepted', 'completed'])
-      : ({ data: [], error: null } as any);
-    const challengeByDate: Record<string, ChallengeStarStatus> = {};
-    for (const row of challengeResult.data ?? []) {
-      const status = row.status as ChallengeStarStatus;
-      const existing = challengeByDate[row.scheduled_date];
-      if (existing === 'completed') continue;
-      challengeByDate[row.scheduled_date] = status === 'completed' ? 'completed' : 'accepted';
+    try {
+      const fromDate = toIsoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1));
+      const toDate = toIsoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 0));
+      const challengeResult = athlete?.id
+        ? await supabase
+            .from('rova_challenges')
+            .select('scheduled_date,status')
+            .eq('athlete_id', athlete.id)
+            .gte('scheduled_date', fromDate)
+            .lte('scheduled_date', toDate)
+            .in('status', ['pending', 'accepted', 'completed'])
+        : ({ data: [], error: null } as any);
+      const challengeByDate: Record<string, ChallengeStarStatus> = {};
+      for (const row of challengeResult.data ?? []) {
+        const status = row.status as ChallengeStarStatus;
+        const existing = challengeByDate[row.scheduled_date];
+        if (existing === 'completed') continue;
+        challengeByDate[row.scheduled_date] = status === 'completed' ? 'completed' : 'accepted';
+      }
+      setChallengeStarsByDate(challengeByDate);
+    } finally {
+      setRaceLoading(false);
     }
-    setChallengeStarsByDate(challengeByDate);
-    setRaceLoading(false);
   }, [athlete?.id, monthAnchor]);
 
   useEffect(() => {
@@ -464,11 +462,13 @@ export default function PlanScreen() {
   const racesByDate = useMemo(() => {
     const grouped: Record<string, RaceGoalCalendarEvent[]> = {};
     for (const row of raceGoals) {
-      if (!grouped[row.event_date]) grouped[row.event_date] = [];
-      grouped[row.event_date].push({
+      const dateKey = raceGoalCalendarDateKey(row.event_date);
+      if (!dateKey) continue;
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push({
         id: row.id,
         name: row.title,
-        date: row.event_date,
+        date: dateKey,
         priority: row.priority === 'a' || row.priority === 'b' ? row.priority : 'c',
         raceType: row.race_type,
         distance: row.goal_overall_time ?? '',
@@ -1009,6 +1009,9 @@ export default function PlanScreen() {
               : weekDates.map((dayIso) => {
               const daySessions = weekSessionsByDate[dayIso] ?? [];
               const hasSessions = daySessions.length > 0;
+              const dayRaces = !raceGoalsLoading ? racesByDate[dayIso] ?? [] : [];
+              const hasRaces = dayRaces.length > 0;
+              const hasDayContent = hasSessions || hasRaces;
               return (
                 <View
                   key={dayIso}
@@ -1018,11 +1021,40 @@ export default function PlanScreen() {
                   onLayout={collectBucketLayouts}
                   style={[
                     styles.weekDaySection,
-                    hasSessions ? styles.weekDaySectionWithSessions : styles.weekDaySectionRest,
+                    hasDayContent ? styles.weekDaySectionWithSessions : styles.weekDaySectionRest,
                     hasSessions && isDragging ? styles.weekDaySectionDragging : null,
                     hasSessions && isDragging ? themed.draggingBorder : null,
                   ]}>
                   <Text style={[styles.weekDayLabel, themed.cardText]}>{formatWeekHeader(dayIso)}</Text>
+                  {hasRaces ? (
+                    <View style={styles.weekRaceList}>
+                      {dayRaces.map((event) => (
+                        <Pressable
+                          key={event.id}
+                          style={[styles.weekRaceCardOuter, themed.card]}
+                          onPress={() => router.push('/goal-races')}>
+                          <View style={styles.weekRaceCardPressable}>
+                            <View style={styles.weekRaceIconWrap}>
+                              <Ionicons
+                                name={event.priority === 'c' ? 'ellipse' : 'flag'}
+                                size={16}
+                                color={event.priority === 'a' ? '#C97E2F' : event.priority === 'b' ? '#B0B7C3' : '#B16C3D'}
+                              />
+                            </View>
+                            <View style={styles.weekRaceCopy}>
+                              <Text style={[styles.weekRaceTitle, themed.cardText]} numberOfLines={2}>
+                                {event.name}
+                              </Text>
+                              <Text style={[styles.weekRaceMeta, themed.subtleText]} numberOfLines={1}>
+                                {`${racePriorityLabel(event.priority)} race · ${daysUntilIsoDate(event.date, todayIso)} days`}
+                              </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.35)} />
+                          </View>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
                   {hasSessions ? (
                     daySessions.map((session) => (
                       <WeekSessionCard
@@ -1039,22 +1071,25 @@ export default function PlanScreen() {
                         }}
                       />
                     ))
-                  ) : (
+                  ) : !hasRaces ? (
                     <View style={styles.weekRestDayWrap}>
                       <Text style={[styles.weekRestDayText, themed.subtleText]}>No session planned</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
               );
             }))}
           </View>
         )}
 
-        {viewMode === 'calendar' ? (
+            {viewMode === 'calendar' ? (
           <View style={[styles.dayPlanCard, themed.card]}>
             <Text style={[styles.dayPlanHeading, themed.cardText]}>{selectedDateLabel}</Text>
-            {!hasScheduledSession ? (
+            {!hasScheduledSession && selectedDateRaces.length === 0 ? (
               <Text style={[styles.sessionTitle, themed.cardText]}>No training session planned</Text>
+            ) : null}
+            {!hasScheduledSession && selectedDateRaces.length > 0 ? (
+              <Text style={[styles.sessionTitle, themed.subtleText]}>No training session planned</Text>
             ) : null}
 
             {selectedDateSessions.length > 0 ? (
@@ -1101,49 +1136,45 @@ export default function PlanScreen() {
               </View>
             ) : null}
 
-            {hasScheduledSession ? (
-              <>
-                {selectedDateRaces.length > 0
-                  ? selectedDateRaces.map((event) => (
-                      <View key={event.id} style={[styles.raceBadge, themed.raceBadge]}>
-                        <View style={styles.raceBadgeHeader}>
-                          <Ionicons
-                            name={event.priority === 'c' ? 'ellipse' : 'flag'}
-                            size={13}
-                            color={event.priority === 'a' ? '#C97E2F' : event.priority === 'b' ? '#B0B7C3' : '#B16C3D'}
-                          />
-                          <Text style={[styles.raceBadgeTitle, themed.raceBadgeText]}>
-                            {`${racePriorityLabel(event.priority)} race`}
-                          </Text>
-                        </View>
-                        <Text style={[styles.raceName, themed.raceBadgeText]}>{event.name}</Text>
-                        <Text style={[styles.raceMeta, themed.raceMeta]}>
-                          {(event.raceType ?? 'event').replace(/-/g, ' ')}
-                          {` · ${daysUntilIsoDate(event.date, todayIso)} days`}
-                          {event.distance ? ` · ${event.distance}` : ''}
-                          {event.notes ? ` · ${event.notes}` : ''}
-                        </Text>
-                        <View style={styles.racePriorityRow}>
-                          {(['a', 'b', 'c'] as const).map((p) => {
-                            const selected = event.priority === p;
-                            return (
-                              <Pressable
-                                key={`${event.id}-${p}`}
-                                style={[styles.racePriorityChip, selected ? styles.racePriorityChipSelected : null]}
-                                onPress={() => void updateRacePriority(event.id, p)}>
-                                <Text style={[styles.racePriorityChipText, selected ? styles.racePriorityChipTextSelected : null]}>
-                                  {racePriorityLabel(p)}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    ))
-                  : null}
+            {selectedDateRaces.length > 0
+              ? selectedDateRaces.map((event) => (
+                  <View key={event.id} style={[styles.raceBadge, themed.raceBadge, hasScheduledSession ? styles.raceBadgeAfterSessions : null]}>
+                    <View style={styles.raceBadgeHeader}>
+                      <Ionicons
+                        name={event.priority === 'c' ? 'ellipse' : 'flag'}
+                        size={13}
+                        color={event.priority === 'a' ? '#C97E2F' : event.priority === 'b' ? '#B0B7C3' : '#B16C3D'}
+                      />
+                      <Text style={[styles.raceBadgeTitle, themed.raceBadgeText]}>{`${racePriorityLabel(event.priority)} race`}</Text>
+                    </View>
+                    <Text style={[styles.raceName, themed.raceBadgeText]}>{event.name}</Text>
+                    <Text style={[styles.raceMeta, themed.raceMeta]}>
+                      {(event.raceType ?? 'event').replace(/-/g, ' ')}
+                      {` · ${daysUntilIsoDate(event.date, todayIso)} days`}
+                      {event.distance ? ` · ${event.distance}` : ''}
+                      {event.notes ? ` · ${event.notes}` : ''}
+                    </Text>
+                    <View style={styles.racePriorityRow}>
+                      {(['a', 'b', 'c'] as const).map((p) => {
+                        const selected = event.priority === p;
+                        return (
+                          <Pressable
+                            key={`${event.id}-${p}`}
+                            style={[styles.racePriorityChip, selected ? styles.racePriorityChipSelected : null]}
+                            onPress={() => void updateRacePriority(event.id, p)}>
+                            <Text style={[styles.racePriorityChipText, selected ? styles.racePriorityChipTextSelected : null]}>
+                              {racePriorityLabel(p)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))
+              : null}
 
-                {monthLoading || raceLoading || raceGoalsLoading ? <Text style={[styles.loadingHint, themed.subtleText]}>Loading calendar data...</Text> : null}
-              </>
+            {monthLoading || raceLoading || raceGoalsLoading ? (
+              <Text style={[styles.loadingHint, themed.subtleText]}>Loading calendar data...</Text>
             ) : null}
           </View>
         ) : null}
@@ -1184,6 +1215,7 @@ export default function PlanScreen() {
           <Text style={[styles.weekPickerTitle, themed.cardText]}>Choose a week</Text>
           <View style={styles.weekPickerCalendarWrap}>
             <DateTimePicker
+              {...datePickerMondayWeekProps()}
               value={weekPickerDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
@@ -1884,6 +1916,46 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,40,64,0.08)',
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  raceBadgeAfterSessions: {
+    marginTop: 18,
+  },
+  weekRaceList: {
+    gap: 8,
+    marginBottom: 4,
+  },
+  weekRaceCardOuter: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'visible',
+  },
+  weekRaceCardPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  weekRaceIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(15,40,64,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  weekRaceCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  weekRaceTitle: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 15,
+  },
+  weekRaceMeta: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 12,
   },
   raceBadgeHeader: {
     flexDirection: 'row',

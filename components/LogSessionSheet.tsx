@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/contexts/ThemeContext';
 import { invalidateSessionRelatedQueries, useActiveAthlete } from '@/hooks/useSessionData';
+import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps } from '@/lib/dates';
 import { withAlpha } from '@/lib/theme-utils';
 import { supabase } from '@/lib/supabase';
 import { syncAppleCalendarIfEnabled } from '@/services/appleCalendarSync';
@@ -168,6 +169,7 @@ export function LogSessionSheet({ visible, onClose, initialDate, onLogged }: Log
     const pickerValue = parseIsoToLocal(selectedDateIso);
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
+        ...datePickerAndroidMondayOpenProps(),
         value: pickerValue,
         mode: 'date',
         onChange: (event, selected) => {
@@ -394,6 +396,7 @@ export function LogSessionSheet({ visible, onClose, initialDate, onLogged }: Log
               {showDatePicker && Platform.OS === 'ios' ? (
                 <View style={styles.datePickerInlineCard}>
                   <DateTimePicker
+                    {...datePickerMondayWeekProps()}
                     value={iosPickerDate}
                     mode="date"
                     display="inline"

@@ -36,6 +36,7 @@ import {
   useWeekSessions,
 } from '@/hooks/useSessionData';
 import { withAlpha } from '@/lib/theme-utils';
+import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 import {
   PERSONAL_BEST_CATALOG,
@@ -209,6 +210,7 @@ export default function ProgressScreen() {
   const fromIso = useMemo(() => toIsoDate(periodStart), [periodStart]);
   const toIso = useMemo(() => toIsoDate(now), [now]);
   const { data: logs = [], isLoading: logsLoading } = useCompletedSessionLogs({
+    athleteId,
     fromIso,
     toIso,
     trainingType: 'overall',
@@ -521,6 +523,7 @@ export default function ProgressScreen() {
     const value = new Date(`${achievedDateIso}T12:00:00`);
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
+        ...datePickerAndroidMondayOpenProps(),
         value,
         mode: 'date',
         onChange: (event, selected) => {
@@ -837,6 +840,7 @@ export default function ProgressScreen() {
                 {iosDatePickerOpen && Platform.OS === 'ios' ? (
                   <View style={styles.datePickerInlineWrap}>
                     <DateTimePicker
+                      {...datePickerMondayWeekProps()}
                       value={new Date(`${achievedDateIso}T12:00:00`)}
                       mode="date"
                       display="inline"
@@ -903,7 +907,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     },
     segmentChip: { flex: 1, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
     segmentChipActive: { backgroundColor: theme.surface },
-    segmentText: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.textMuted },
+    segmentText: { fontFamily: 'DMSans-Medium', fontSize: 13, color: theme.textMuted },
     segmentTextActive: { color: theme.text },
     card: {
       backgroundColor: theme.surface,
@@ -941,7 +945,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       backgroundColor: theme.accent,
     },
     levelNext: {
-      fontFamily: 'DMSans_400Regular',
+      fontFamily: 'DMSans-Regular',
       fontSize: 12,
       color: withAlpha(theme.primary, 0.4),
     },
@@ -974,24 +978,24 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     },
     sectionTitle: { fontFamily: 'CormorantGaramond_700Bold', fontSize: 24, color: theme.primary },
     rowSpread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-    metricTitle: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.text },
-    metricValue: { fontFamily: 'DMSans_700Bold', fontSize: 13, color: theme.primary },
+    metricTitle: { fontFamily: 'DMSans-Medium', fontSize: 13, color: theme.text },
+    metricValue: { fontFamily: 'DMSans-Bold', fontSize: 13, color: theme.primary },
     weekDotsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingHorizontal: 4 },
     weekDot: { width: 12, height: 12, borderRadius: 6 },
     weekDotDone: { backgroundColor: theme.accent },
     weekDotPlanned: { backgroundColor: theme.primary },
     weekDotEmpty: { backgroundColor: withAlpha(theme.primary, 0.2) },
-    blockValue: { fontFamily: 'DMSans_700Bold', fontSize: 22, color: theme.primary },
-    blockCaption: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted },
+    blockValue: { fontFamily: 'DMSans-Bold', fontSize: 22, color: theme.primary },
+    blockCaption: { fontFamily: 'DMSans-Regular', fontSize: 12, color: theme.textMuted },
     breakdownStack: { gap: 6, marginTop: 4 },
     breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    breakdownLabel: { width: 40, fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.textMuted, textTransform: 'capitalize' },
+    breakdownLabel: { width: 40, fontFamily: 'DMSans-Medium', fontSize: 12, color: theme.textMuted, textTransform: 'capitalize' },
     breakdownTrack: { flex: 1, height: 8, borderRadius: 999, backgroundColor: withAlpha(theme.primary, 0.12), overflow: 'hidden' },
     breakdownFill: { height: '100%', borderRadius: 999, backgroundColor: theme.accent },
-    breakdownPct: { width: 36, textAlign: 'right', fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.textMuted },
+    breakdownPct: { width: 36, textAlign: 'right', fontFamily: 'DMSans-Medium', fontSize: 12, color: theme.textMuted },
     avgRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
-    avgText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.textMuted },
-    levelHint: { textAlign: 'right', fontFamily: 'DMSans_400Regular', fontSize: 11, color: withAlpha(theme.primary, 0.4) },
+    avgText: { fontFamily: 'DMSans-Medium', fontSize: 12, color: theme.textMuted },
+    levelHint: { textAlign: 'right', fontFamily: 'DMSans-Regular', fontSize: 11, color: withAlpha(theme.primary, 0.4) },
     pbRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -1001,9 +1005,9 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     },
     pbLeft: { flex: 1, gap: 2 },
     pbRight: { alignItems: 'flex-end', gap: 4 },
-    pbLabel: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.text },
-    pbDate: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: theme.textMuted },
-    pbValue: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.primary },
+    pbLabel: { fontFamily: 'DMSans-Medium', fontSize: 13, color: theme.text },
+    pbDate: { fontFamily: 'DMSans-Regular', fontSize: 11, color: theme.textMuted },
+    pbValue: { fontFamily: 'DMSans-Medium', fontSize: 14, color: theme.primary },
     pbBadge: {
       paddingHorizontal: 8,
       paddingVertical: 2,
@@ -1012,9 +1016,9 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       borderWidth: 1,
       borderColor: withAlpha(theme.accent, 0.35),
     },
-    pbBadgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 9, color: theme.primary, letterSpacing: 0.4 },
+    pbBadgeText: { fontFamily: 'DMSans-SemiBold', fontSize: 9, color: theme.primary, letterSpacing: 0.4 },
     addCustomPb: { paddingVertical: 10, alignItems: 'center' },
-    addCustomPbText: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.accent },
+    addCustomPbText: { fontFamily: 'DMSans-Medium', fontSize: 13, color: theme.accent },
     activityRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -1023,8 +1027,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       borderBottomWidth: 1,
       borderBottomColor: withAlpha(theme.primary, 0.08),
     },
-    activityTitle: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.text },
-    activityMeta: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted, marginTop: 2 },
+    activityTitle: { fontFamily: 'DMSans-Medium', fontSize: 13, color: theme.text },
+    activityMeta: { fontFamily: 'DMSans-Regular', fontSize: 12, color: theme.textMuted, marginTop: 2 },
     keyboardRoot: { flex: 1 },
     sheetModalInner: { flex: 1, justifyContent: 'flex-end' },
     sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.42)' },
@@ -1058,13 +1062,13 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     sheetTitle: { fontFamily: 'CormorantGaramond_700Bold', fontSize: 24, color: theme.primary, marginBottom: 10 },
     sheetScroll: { gap: 12, paddingBottom: 12 },
     fieldLabel: {
-      fontFamily: 'DMSans_600SemiBold',
+      fontFamily: 'DMSans-SemiBold',
       fontSize: 10,
       letterSpacing: 0.6,
       color: theme.accent,
       textTransform: 'uppercase',
     },
-    previewBody: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text },
+    previewBody: { fontFamily: 'DMSans-Regular', fontSize: 13, color: theme.text },
     sheetInput: {
       backgroundColor: theme.surface,
       borderWidth: 1,
@@ -1072,7 +1076,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontFamily: 'DMSans_400Regular',
+      fontFamily: 'DMSans-Regular',
       fontSize: 14,
       color: theme.primary,
     },
@@ -1084,10 +1088,10 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       alignItems: 'center',
     },
     primaryBtnDisabled: { opacity: 0.45 },
-    primaryBtnText: { fontFamily: 'DMSans_500Medium', fontSize: 15, color: theme.onPrimary },
+    primaryBtnText: { fontFamily: 'DMSans-Medium', fontSize: 15, color: theme.onPrimary },
     cancelLink: {
       textAlign: 'center',
-      fontFamily: 'DMSans_500Medium',
+      fontFamily: 'DMSans-Medium',
       fontSize: 14,
       color: withAlpha(theme.primary, 0.4),
       marginTop: 8,
@@ -1097,7 +1101,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     pill: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
     pillIdle: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.primary },
     pillActive: { backgroundColor: theme.primary, borderWidth: 1, borderColor: theme.primary },
-    pillText: { fontFamily: 'DMSans_500Medium', fontSize: 12 },
+    pillText: { fontFamily: 'DMSans-Medium', fontSize: 12 },
     pillTextIdle: { color: theme.primary },
     pillTextActive: { color: theme.onPrimary },
     distanceInlineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -1106,7 +1110,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     unitChip: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10, minWidth: 46, alignItems: 'center' },
     unitChipOn: { backgroundColor: theme.primary },
     unitChipOff: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.primary },
-    unitChipText: { fontFamily: 'DMSans_500Medium', fontSize: 12 },
+    unitChipText: { fontFamily: 'DMSans-Medium', fontSize: 12 },
     unitChipTextOn: { color: theme.onPrimary },
     unitChipTextOff: { color: theme.primary },
     dateRow: {
@@ -1120,7 +1124,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       paddingVertical: 12,
       paddingHorizontal: 14,
     },
-    dateRowText: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.primary },
+    dateRowText: { fontFamily: 'DMSans-Medium', fontSize: 14, color: theme.primary },
     datePickerInlineWrap: {
       marginTop: 8,
       borderRadius: 12,
@@ -1154,5 +1158,5 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       backgroundColor: theme.primary,
       alignItems: 'center',
     },
-    iosPickerDoneText: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.onPrimary },
+    iosPickerDoneText: { fontFamily: 'DMSans-Medium', fontSize: 14, color: theme.onPrimary },
   });
