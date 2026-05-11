@@ -784,7 +784,7 @@ export default function PlanScreen() {
       <StatusAreaFade height={insets.top + 8} />
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }, Platform.OS === 'web' ? styles.webContent : null]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isDragging}
         scrollEventThrottle={16}
@@ -1261,6 +1261,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 130,
     gap: 16,
+  },
+  webContent: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
   },
   compactHeaderText: {
     fontFamily: 'CormorantGaramond_700Bold',

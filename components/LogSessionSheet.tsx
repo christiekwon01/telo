@@ -116,6 +116,20 @@ function sanitizeDecimalInput(value: string) {
   );
 }
 
+function openWebMediaPicker(onPicked: (uris: string[]) => void) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,video/*';
+  input.multiple = true;
+  input.onchange = () => {
+    const files = input.files ? Array.from(input.files) : [];
+    if (files.length === 0) return;
+    onPicked(files.map((file) => URL.createObjectURL(file)));
+  };
+  input.click();
+}
+
 export function LogSessionSheet({ visible, onClose, initialDate, onLogged }: LogSessionSheetProps) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -192,6 +206,10 @@ export function LogSessionSheet({ visible, onClose, initialDate, onLogged }: Log
   });
 
   const pickFromLibrary = async () => {
+    if (Platform.OS === 'web') {
+      openWebMediaPicker((uris) => setMediaUris((prev) => [...prev, ...uris]));
+      return;
+    }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Allow photo library access to add media.');
@@ -208,6 +226,10 @@ export function LogSessionSheet({ visible, onClose, initialDate, onLogged }: Log
   };
 
   const pickFromCamera = async () => {
+    if (Platform.OS === 'web') {
+      openWebMediaPicker((uris) => setMediaUris((prev) => [...prev, ...uris]));
+      return;
+    }
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Allow camera access to capture media.');
@@ -223,6 +245,10 @@ export function LogSessionSheet({ visible, onClose, initialDate, onLogged }: Log
   };
 
   const onAddMedia = () => {
+    if (Platform.OS === 'web') {
+      void pickFromLibrary();
+      return;
+    }
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {

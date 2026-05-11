@@ -48,6 +48,20 @@ function sanitizeDecimalInput(value: string) {
   );
 }
 
+function openWebMediaPicker(onPicked: (uris: string[]) => void) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,video/*';
+  input.multiple = true;
+  input.onchange = () => {
+    const files = input.files ? Array.from(input.files) : [];
+    if (files.length === 0) return;
+    onPicked(files.map((file) => URL.createObjectURL(file)));
+  };
+  input.click();
+}
+
 type SessionDraftValues = {
   notes: string;
   duration: string;
@@ -372,6 +386,10 @@ export default function SessionDetailScreen() {
   };
 
   const pickFromLibrary = async () => {
+    if (Platform.OS === 'web') {
+      openWebMediaPicker((uris) => setMediaUris((prev) => [...prev, ...uris]));
+      return;
+    }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Allow photo library access to add media.');
@@ -388,6 +406,10 @@ export default function SessionDetailScreen() {
   };
 
   const pickFromCamera = async () => {
+    if (Platform.OS === 'web') {
+      openWebMediaPicker((uris) => setMediaUris((prev) => [...prev, ...uris]));
+      return;
+    }
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Allow camera access to capture media.');
@@ -403,6 +425,10 @@ export default function SessionDetailScreen() {
   };
 
   const onAddMedia = () => {
+    if (Platform.OS === 'web') {
+      void pickFromLibrary();
+      return;
+    }
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -479,6 +505,22 @@ export default function SessionDetailScreen() {
     ]);
   };
 
+  if (!sessionId) {
+    return (
+      <SafeAreaView style={[styles.screen, themed.screen]}>
+        <View style={styles.centerState}>
+          <Text style={[styles.centerStateText, themed.text]}>Missing session</Text>
+          <Text style={[styles.centerStateSubtext, themed.mutedText]}>
+            Open a session from Today or Plan to view details.
+          </Text>
+          <TouchableOpacity style={[styles.backButton, themed.primarySurface]} onPress={() => router.back()}>
+            <Text style={[styles.backButtonText, themed.onPrimary]}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.screen, themed.screen]}>
@@ -546,7 +588,7 @@ export default function SessionDetailScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' ? styles.webContent : null]} showsVerticalScrollIndicator={false}>
         <View style={[styles.heroCard, themed.primarySurface]}>
           <Text style={[styles.heroTitle, themed.onPrimary]}>{session.title}</Text>
           <Text style={[styles.heroMeta, { color: withAlpha(theme.onPrimary, 0.6) }]}>{sessionDetails.join(' · ')}</Text>
@@ -784,6 +826,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0F2840',
   },
+  centerStateSubtext: {
+    marginTop: 8,
+    fontFamily: 'System',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   backButton: {
     marginTop: 12,
     borderRadius: 999,
@@ -823,6 +872,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 130,
     gap: 12,
+  },
+  webContent: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
   },
   heroCard: {
     backgroundColor: '#0F2840',

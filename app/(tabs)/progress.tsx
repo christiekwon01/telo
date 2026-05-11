@@ -544,7 +544,7 @@ export default function ProgressScreen() {
       <StatusAreaFade height={insets.top + 8} />
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, Platform.OS === 'web' ? styles.webContent : null]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}>
         <TabHeader title="Progress" paddingHorizontal={0} />
@@ -896,6 +896,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: theme.base },
     content: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 140, gap: 14 },
+    webContent: { width: '100%', maxWidth: 800, alignSelf: 'center' },
     segmentWrap: {
       marginTop: -2,
       flexDirection: 'row',

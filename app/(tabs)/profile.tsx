@@ -240,7 +240,7 @@ export default function ProfileScreen() {
       <StatusAreaFade height={insets.top + 8} />
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, Platform.OS === 'web' ? styles.webContent : null]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}>
         <TabHeader title="Profile" paddingHorizontal={0} />
@@ -504,6 +504,11 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 140,
+  },
+  webContent: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
   },
   subHeading: {
     marginTop: 2,

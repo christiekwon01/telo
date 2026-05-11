@@ -26,6 +26,7 @@ import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
 import { useActiveAthlete, useLevelProgress, useRaceGoals, useUpcomingSessions, useTodaysSessions, useWeekSessions } from '@/hooks/useSessionData';
 import { useWeeklyChallenges } from '@/hooks/useWeeklyChallenges';
 import { isAnthropicEnabled } from '@/lib/anthropic';
+import { toLocalIsoDate } from '@/lib/dates';
 import { withAlpha } from '@/lib/theme-utils';
 import { supabase } from '@/lib/supabase';
 import { fetchTodayCoachDirective } from '@/services/rovaIntelligence';
@@ -35,13 +36,6 @@ import {
   getPrimaryRaceForPlanning,
   toIsoDateLocal,
 } from '@/services/racePriority';
-
-function toIsoDate(value: Date) {
-  const year = value.getFullYear();
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function getWeekStartMonday(anchor: Date) {
   const day = anchor.getDay();
@@ -60,7 +54,7 @@ function addDays(value: Date, days: number) {
 
 /** When Rova API is unavailable, keep the card conversational from local cues. */
 function buildCoachDirectiveFallback(
-  sessions: Array<{ sport: string; title: string; completionStatus: string }>,
+  sessions: { sport: string; title: string; completionStatus: string }[],
   weekDone: number,
   weekTotal: number
 ): string {
@@ -110,7 +104,7 @@ export default function HomeScreen() {
   const nextLevel = levelProgress.nextLevel;
   const atPeakTier = levelProgress.atPeakTier;
   const weekStart = useMemo(() => getWeekStartMonday(new Date()), []);
-  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => toIsoDate(addDays(weekStart, i))), [weekStart]);
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => toLocalIsoDate(addDays(weekStart, i))), [weekStart]);
   const { data: weekSessionsByDate = {}, isLoading: weekLoading } = useWeekSessions(weekStart);
   const [isIntentionsOpen, setIsIntentionsOpen] = useState(false);
   const [isFlexWeekOpen, setIsFlexWeekOpen] = useState(false);
@@ -145,8 +139,7 @@ export default function HomeScreen() {
     return todayDate;
   }, [raceGoals, todayDate]);
   const isMonday = useMemo(() => new Date().getDay() === 1, []);
-  const todayIso = useMemo(() => toIsoDate(new Date()), []);
-  const todayIsoUtc = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayIso = useMemo(() => toLocalIsoDate(new Date()), []);
   const weekStats = useMemo(() => {
     const sessionsAll = weekDates.flatMap((date) => weekSessionsByDate[date] ?? []);
     const nonRest = sessionsAll.filter((s) => s.sport !== 'rest');
@@ -334,11 +327,9 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (__DEV__) {
-      console.log(
-        `[${new Date().toISOString()}] [Today] useTodaysSessions date=${todayIso} (utc=${todayIsoUtc})`
-      );
+      console.log(`[${new Date().toISOString()}] [Today] useTodaysSessions localCalendar=${todayIso}`);
     }
-  }, [todayIso, todayIsoUtc]);
+  }, [todayIso]);
 
   useEffect(() => {
     if (sessionsLoading) return;
@@ -360,8 +351,8 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!athlete?.id) return;
     const checkMissedStreak = async () => {
-      const fromIso = toIsoDate(addDays(new Date(), -14));
-      const toIso = toIsoDate(new Date());
+      const fromIso = toLocalIsoDate(addDays(new Date(), -14));
+      const toIso = toLocalIsoDate(new Date());
       const { data, error } = await supabase
         .from('sessions')
         .select('scheduled_date,status')
@@ -452,7 +443,7 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.screen, themeStyles.screen]}>
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' ? styles.webContent : null]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -718,6 +709,11 @@ const styles = StyleSheet.create({
     paddingBottom: 150,
     gap: 16,
   },
+  webContent: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
+  },
   headerButtons: {
     flexDirection: 'row',
     gap: 10,
@@ -758,7 +754,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   coachLabel: {
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'DMSans-SemiBold',
     fontSize: 13,
     color: '#C97E2F',
   },
@@ -767,7 +763,7 @@ const styles = StyleSheet.create({
   },
   coachBadgeText: {
     color: 'rgba(255,255,255,0.35)',
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'DMSans-SemiBold',
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
@@ -780,7 +776,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   coachNote: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     lineHeight: 20,
     color: 'rgba(255,255,255,0.7)',
@@ -820,7 +816,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   wildCardLabel: {
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'DMSans-SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 0.9,
     fontSize: 10,
@@ -828,13 +824,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   wildCardTitle: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 13,
     color: '#0F2840',
     marginBottom: 2,
   },
   wildCardDescription: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 12,
     lineHeight: 17,
     color: 'rgba(15,40,64,0.6)',
@@ -853,17 +849,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   wildPrimaryBtnText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#FFFFFF',
   },
   wildSkipText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: 'rgba(15,40,64,0.45)',
   },
   wildCompleteText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#C97E2F',
   },
@@ -890,7 +886,7 @@ const styles = StyleSheet.create({
     color: '#0F2840',
   },
   weeklyDateRange: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 11,
     color: 'rgba(15,40,64,0.4)',
   },
@@ -905,13 +901,13 @@ const styles = StyleSheet.create({
     minWidth: 34,
   },
   dayLabel: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 10,
     color: 'rgba(15,40,64,0.4)',
   },
   dayLabelToday: {
     color: '#C97E2F',
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
   },
   dayDotDone: {
     width: 12,
@@ -958,7 +954,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   intentionsBannerText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#0F2840',
   },
@@ -981,7 +977,7 @@ const styles = StyleSheet.create({
     color: '#0F2840',
   },
   statLabel: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 10,
     color: 'rgba(15,40,64,0.4)',
   },
@@ -1012,7 +1008,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#C97E2F',
   },
   levelNext: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 12,
     color: 'rgba(15,40,64,0.4)',
   },
@@ -1045,7 +1041,7 @@ const styles = StyleSheet.create({
   },
   levelHint: {
     textAlign: 'right',
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 11,
     color: 'rgba(15,40,64,0.4)',
   },
@@ -1055,12 +1051,12 @@ const styles = StyleSheet.create({
     color: '#0F2840',
   },
   sessionsLoading: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 12,
     color: 'rgba(15,40,64,0.4)',
   },
   sessionsError: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#C97E2F',
   },
@@ -1101,7 +1097,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   upcomingDateLabel: {
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'DMSans-SemiBold',
     fontSize: 11,
     color: 'rgba(15,40,64,0.5)',
     textTransform: 'uppercase',
@@ -1140,7 +1136,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   workoutTitle: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 15,
     color: '#0F2840',
     marginBottom: 2,
@@ -1149,12 +1145,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   workoutSubtitle: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 12,
     color: 'rgba(15,40,64,0.4)',
   },
   workoutSubtitleDone: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#C97E2F',
   },
@@ -1220,7 +1216,7 @@ const styles = StyleSheet.create({
   },
   sheetLabel: {
     textAlign: 'center',
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'DMSans-SemiBold',
     fontSize: 11,
     color: '#C97E2F',
     letterSpacing: 1.1,
@@ -1235,7 +1231,7 @@ const styles = StyleSheet.create({
   },
   sheetDescription: {
     textAlign: 'center',
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     lineHeight: 19,
     color: 'rgba(15,40,64,0.55)',
@@ -1250,13 +1246,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sheetPrimaryButtonText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     color: '#F6F3EE',
     fontSize: 15,
   },
   sheetSkipText: {
     textAlign: 'center',
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     color: 'rgba(15,40,64,0.4)',
     fontSize: 14,
   },
@@ -1274,7 +1270,7 @@ const styles = StyleSheet.create({
     borderColor: '#0F2840',
   },
   flagText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 14,
     color: '#0F2840',
   },
@@ -1287,7 +1283,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   flexNudgeText: {
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#0F2840',
   },

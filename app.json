@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "telo",
+    "platforms": ["ios", "android", "web"],
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "icon": "./assets/icon.png",
@@ -44,8 +45,34 @@
       ]
     },
     "web": {
+      "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#F6F3EE",
+      "name": "telo",
+      "shortName": "telo",
+      "description": "Triathlon training — clear daily guidance, flexible planning.",
+      "themeColor": "#0F2840",
+      "lang": "en-AU",
+      "manifest": {
+        "display": "standalone",
+        "orientation": "portrait",
+        "start_url": "/",
+        "background_color": "#F6F3EE",
+        "theme_color": "#0F2840",
+        "icons": [
+          {
+            "src": "./assets/icon.png",
+            "sizes": "192x192",
+            "type": "image/png"
+          },
+          {
+            "src": "./assets/icon.png",
+            "sizes": "512x512",
+            "type": "image/png"
+          }
+        ]
+      }
     },
     "plugins": [
       "expo-router",

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 
 /** Active tab icon + label (amber). Inactive: white @ 50% opacity. */
@@ -16,7 +16,11 @@ type Props = {
 export function FloatingPillNav({ active }: Props) {
   const router = useRouter();
   const { theme } = useTheme();
+  const { width } = useWindowDimensions();
   const navBackground = theme.id === 'obsidianIce' ? theme.surface : theme.primary;
+  const isWebDesktop = Platform.OS === 'web' && width > 768;
+
+  if (isWebDesktop) return null;
 
   const tabs: { key: Props['active']; icon: keyof typeof Ionicons.glyphMap; label: string; route: NavRoute }[] = [
     { key: 'today', icon: 'locate', label: 'Today', route: '/(tabs)' },
