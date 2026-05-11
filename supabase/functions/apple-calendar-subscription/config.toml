@@ -1,0 +1,2 @@
+[functions.apple-calendar-subscription]
+verify_jwt = false

@@ -1,0 +1,2 @@
+{"sessionId":"03c1bf","runId":"post-supabase-install","hypothesisId":"H6","location":"lib/supabase.ts:afterCreateClient","message":"supabase module initialized","data":{"hasUrl":true,"hasAnonKey":true},"timestamp":1778045678490}
+{"sessionId":"03c1bf","runId":"post-supabase-install","hypothesisId":"H6","location":"lib/supabase.ts:afterCreateClient","message":"supabase module initialized","data":{"hasUrl":true,"hasAnonKey":true},"timestamp":1778046982198}

@@ -1,0 +1,87 @@
+{
+  "expo": {
+    "name": "telo",
+    "slug": "telo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "telo",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F6F3EE"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.telo.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "telo uses your camera to add photos to session logs.",
+        "NSPhotoLibraryUsageDescription": "telo accesses your photos to add images to session logs.",
+        "NSPhotoLibraryAddUsageDescription": "telo can save exported images from your training logs to your library when you choose to.",
+        "NSCalendarsUsageDescription": "telo can add training sessions to your Apple Calendar.",
+        "NSCalendarsFullAccessUsageDescription": "telo can add training sessions to your Apple Calendar when you enable calendar sync."
+      }
+    },
+    "android": {
+      "package": "com.telo.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F6F3EE"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#F6F3EE"
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "telo accesses your photos to add images to session logs.",
+          "cameraPermission": "telo uses your camera to capture session photos."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "telo can add your training sessions to Apple Calendar."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4872e364-2e89-42e9-8fe7-fa7a9ff97e35"
+      }
+    }
+  }
+}
