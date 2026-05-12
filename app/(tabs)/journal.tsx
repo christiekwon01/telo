@@ -45,6 +45,7 @@ export default function JournalScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isWeb = Platform.OS === 'web';
 
   const [monthAnchor, setMonthAnchor] = useState(() => {
     const n = new Date();
@@ -197,7 +198,118 @@ export default function JournalScreen() {
             </View>
 
             {(() => {
-              const monthCalendar = (
+              const weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
+
+              const renderDayCell = (cell: { iso: string; inMonth: boolean } | null, idx: number) => {
+                if (!cell) {
+                  return <View key={`e-${idx}`} style={isWeb ? styles.dayCellEmptyWeb : styles.cell} />;
+                }
+                const { iso } = cell;
+                const jr = reflectionDates.has(iso);
+                const sc = sessionCompletedByDate.get(iso);
+                let dotColor: string | null = null;
+                if (jr && sc) dotColor = DOT.both;
+                else if (jr) dotColor = DOT.journal;
+                else if (sc) dotColor = DOT.session;
+                const isTodayCell = iso === todayIso;
+                const isSelectedCell = dayDetailIso === iso;
+                const isHighlightedCell = isTodayCell || isSelectedCell;
+
+                const cellShellStyle = isWeb
+                  ? [
+                      styles.dayCellWeb,
+                      isSelectedCell ? styles.dayCellSelectedWeb : null,
+                      isTodayCell && !isSelectedCell ? styles.dayCellTodayRingWeb : null,
+                    ]
+                  : [
+                      styles.cell,
+                      isTodayCell ? styles.cellToday : null,
+                      isSelectedCell && !isTodayCell ? styles.cellSelected : null,
+                    ];
+
+                const numStyle = isWeb
+                  ? [
+                      styles.cellNumWeb,
+                      isSelectedCell ? styles.cellNumWebSelected : null,
+                      isTodayCell && !isSelectedCell ? styles.cellNumWebToday : null,
+                    ]
+                  : [
+                      styles.cellNum,
+                      isTodayCell ? styles.cellNumToday : null,
+                      isSelectedCell && !isTodayCell ? styles.cellNumSelected : null,
+                    ];
+
+                const dotRowStyle = isWeb ? [styles.dotRow, styles.dotRowWeb] : styles.dotRow;
+
+                return (
+                  <Pressable key={iso} style={cellShellStyle} onPress={() => setDayDetailIso(iso)}>
+                    <Text style={numStyle}>{Number(iso.slice(8, 10))}</Text>
+                    <View style={dotRowStyle}>
+                      {dotColor ? (
+                        isHighlightedCell ? (
+                          <View
+                            style={[
+                              styles.dotHalo,
+                              {
+                                borderColor: withAlpha(theme.accent, 0.5),
+                                backgroundColor: withAlpha(theme.accent, 0.22),
+                              },
+                            ]}>
+                            <View style={[styles.dotInner, { backgroundColor: dotColor }]} />
+                          </View>
+                        ) : (
+                          <View style={[styles.dot, { backgroundColor: dotColor }]} />
+                        )
+                      ) : (
+                        <View style={styles.dotPlaceholder} />
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              };
+
+              const monthCalendar = isWeb ? (
+                <View style={styles.calendarCardWeb}>
+                  <View style={styles.monthRowWeb}>
+                    <Text style={styles.monthTitleWeb}>{monthLabel}</Text>
+                    <View style={styles.monthControlsWeb}>
+                      <Pressable hitSlop={8} onPress={() => shiftMonth(-1)}>
+                        <Ionicons name="chevron-back" size={18} color={theme.primary} />
+                      </Pressable>
+                      <Pressable hitSlop={8} onPress={() => shiftMonth(1)}>
+                        <Ionicons name="chevron-forward" size={18} color={theme.primary} />
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <View style={styles.weekdayRowWeb}>
+                    {weekdayLabels.map((d, i) => (
+                      <Text key={`${d}-${i}`} style={styles.weekdayWeb}>
+                        {d}
+                      </Text>
+                    ))}
+                  </View>
+
+                  {monthLoading ? <ActivityIndicator color={theme.accent} style={{ marginVertical: 16 }} /> : null}
+
+                  <View style={styles.gridWeb}>{grid.map((cell, idx) => renderDayCell(cell, idx))}</View>
+
+                  <View style={styles.legendRowWeb}>
+                    <View style={styles.legendItemWeb}>
+                      <View style={[styles.dot, { backgroundColor: DOT.session }]} />
+                      <Text style={styles.legendTextWeb}>Session</Text>
+                    </View>
+                    <View style={styles.legendItemWeb}>
+                      <View style={[styles.dot, { backgroundColor: DOT.journal }]} />
+                      <Text style={styles.legendTextWeb}>Reflection</Text>
+                    </View>
+                    <View style={styles.legendItemWeb}>
+                      <View style={[styles.dot, { backgroundColor: DOT.both }]} />
+                      <Text style={styles.legendTextWeb}>Both</Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
                 <View>
                   <View style={styles.monthNav}>
                     <Pressable onPress={() => shiftMonth(-1)} hitSlop={12} style={styles.monthArrow}>
@@ -210,7 +322,7 @@ export default function JournalScreen() {
                   </View>
 
                   <View style={styles.weekdayRow}>
-                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+                    {weekdayLabels.map((d, i) => (
                       <Text key={`${d}-${i}`} style={styles.weekday}>
                         {d}
                       </Text>
@@ -222,66 +334,13 @@ export default function JournalScreen() {
                   <View style={styles.grid}>
                     {Array.from({ length: 6 }, (_, row) => (
                       <View key={`row-${row}`} style={styles.gridRow}>
-                        {grid.slice(row * 7, row * 7 + 7).map((cell, colIdx) => {
-                          const idx = row * 7 + colIdx;
-                          if (!cell) {
-                            return <View key={`e-${idx}`} style={styles.cell} />;
-                          }
-                          const { iso } = cell;
-                          const jr = reflectionDates.has(iso);
-                          const sc = sessionCompletedByDate.get(iso);
-                          let dotColor: string | null = null;
-                          if (jr && sc) dotColor = DOT.both;
-                          else if (jr) dotColor = DOT.journal;
-                          else if (sc) dotColor = DOT.session;
-                          const isTodayCell = iso === todayIso;
-                          const isSelectedCell = dayDetailIso === iso;
-                          const isHighlightedCell = isTodayCell || isSelectedCell;
-                          return (
-                            <Pressable
-                              key={iso}
-                              style={[
-                                styles.cell,
-                                isTodayCell ? styles.cellToday : null,
-                                isSelectedCell && !isTodayCell ? styles.cellSelected : null,
-                              ]}
-                              onPress={() => setDayDetailIso(iso)}>
-                              <Text
-                                style={[
-                                  styles.cellNum,
-                                  isTodayCell ? styles.cellNumToday : null,
-                                  isSelectedCell && !isTodayCell ? styles.cellNumSelected : null,
-                                ]}>
-                                {Number(iso.slice(8, 10))}
-                              </Text>
-                              <View style={styles.dotRow}>
-                                {dotColor ? (
-                                  isHighlightedCell ? (
-                                    <View
-                                      style={[
-                                        styles.dotHalo,
-                                        {
-                                          borderColor: withAlpha(theme.accent, 0.5),
-                                          backgroundColor: withAlpha(theme.accent, 0.22),
-                                        },
-                                      ]}>
-                                      <View style={[styles.dotInner, { backgroundColor: dotColor }]} />
-                                    </View>
-                                  ) : (
-                                    <View style={[styles.dot, { backgroundColor: dotColor }]} />
-                                  )
-                                ) : (
-                                  <View style={styles.dotPlaceholder} />
-                                )}
-                              </View>
-                            </Pressable>
-                          );
-                        })}
+                        {grid.slice(row * 7, row * 7 + 7).map((cell, colIdx) => renderDayCell(cell, row * 7 + colIdx))}
                       </View>
                     ))}
                   </View>
                 </View>
               );
+
               return swipeMonthGesture ? (
                 <GestureDetector gesture={swipeMonthGesture}>{monthCalendar}</GestureDetector>
               ) : (
@@ -535,6 +594,103 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
     streakBody: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: theme.text },
     streakEm: { fontFamily: 'DMSans_600SemiBold', color: theme.primary },
     streakFire: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.primary, marginTop: 8 },
+    calendarCardWeb: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: withAlpha(theme.primary, 0.1),
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 10,
+      marginTop: 8,
+    },
+    monthRowWeb: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    monthTitleWeb: {
+      flex: 1,
+      marginRight: 8,
+      fontFamily: 'DMSans_600SemiBold',
+      fontSize: 15,
+      color: theme.text,
+    },
+    monthControlsWeb: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    weekdayRowWeb: { flexDirection: 'row', marginBottom: 8 },
+    weekdayWeb: {
+      width: `${100 / 7}%`,
+      textAlign: 'center',
+      fontFamily: 'DMSans_500Medium',
+      fontSize: 11,
+      color: theme.textMuted,
+    },
+    gridWeb: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      rowGap: 4,
+      paddingHorizontal: 2,
+      paddingVertical: 0,
+    },
+    dayCellWeb: {
+      width: '13.5%',
+      height: 54,
+      borderRadius: 10,
+      backgroundColor: theme.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    dayCellEmptyWeb: {
+      width: '13.5%',
+      height: 56,
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+    },
+    dayCellTodayRingWeb: {
+      borderColor: theme.primary,
+      backgroundColor: theme.surface,
+    },
+    dayCellSelectedWeb: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    cellNumWeb: {
+      fontFamily: 'DMSans_500Medium',
+      fontSize: 14,
+      color: theme.text,
+      marginBottom: 1,
+    },
+    cellNumWebToday: {
+      color: theme.text,
+    },
+    cellNumWebSelected: {
+      fontFamily: 'DMSans_600SemiBold',
+      color: theme.onPrimary,
+    },
+    dotRowWeb: {
+      minHeight: 12,
+      marginTop: 0,
+    },
+    legendRowWeb: {
+      marginTop: 4,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+      columnGap: 10,
+      rowGap: 6,
+    },
+    legendItemWeb: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    legendTextWeb: {
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 10,
+      color: theme.textMuted,
+    },
     monthNav: {
       flexDirection: 'row',
       alignItems: 'center',
