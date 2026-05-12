@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { saveAthleteId } from '@/lib/athlete-session';
-import { datePickerMondayWeekProps, toLocalIsoDate } from '@/lib/dates';
+import { datePickerMondayWeekProps, openWebDateInput, toLocalIsoDate } from '@/lib/dates';
 import { markOnboardingComplete } from '@/lib/onboarding-completion';
 import { ensureSupabaseAuthUser } from '@/lib/supabase-auth';
 import { supabase } from '@/lib/supabase';
@@ -189,6 +189,17 @@ export default function OnboardingScreen() {
     }
   };
 
+  const openRaceDatePicker = () => {
+    if (
+      openWebDateInput(raceDate || undefined, (isoDate) => {
+        setRaceDate(isoDate);
+      })
+    ) {
+      return;
+    }
+    setShowDatePicker(true);
+  };
+
   const stepMeaning = level === 'fara' ? 'To set out.' : level === 'orka' ? 'To endure.' : 'To achieve.';
   const translateX = transitionProgress.interpolate({
     inputRange: [0, 1],
@@ -328,12 +339,12 @@ export default function OnboardingScreen() {
         {displayedStep === 4 ? (
           <View>
             <Text style={styles.heading}>When is your race?</Text>
-            <Pressable style={styles.textInput} onPress={() => setShowDatePicker(true)}>
+            <Pressable style={styles.textInput} onPress={openRaceDatePicker}>
               <Text style={raceDate ? styles.inputText : styles.placeholderText}>
                 {raceDate || 'Select race date'}
               </Text>
             </Pressable>
-            {showDatePicker ? (
+            {showDatePicker && Platform.OS !== 'web' ? (
               <DateTimePicker
                 {...datePickerMondayWeekProps()}
                 value={raceDate ? new Date(raceDate) : new Date()}

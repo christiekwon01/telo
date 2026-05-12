@@ -22,7 +22,7 @@ import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sessionQueryKeys, useActiveAthlete, useRaceGoals } from '@/hooks/useSessionData';
 import { ensureAthleteRowExists, ensureSupabaseAuthUser } from '@/lib/supabase-auth';
-import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps } from '@/lib/dates';
+import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps, openWebDateInput } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 
 type GoalForm = {
@@ -58,6 +58,12 @@ function normalizeIsoDate(value: Date) {
   const month = `${value.getMonth() + 1}`.padStart(2, '0');
   const day = `${value.getDate()}`.padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function normalizeRaceGoalDateInput(value: string | null | undefined) {
+  if (!value) return '';
+  const m = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : value;
 }
 
 function addMonths(base: Date, months: number) {
@@ -166,12 +172,7 @@ function GoalTimeInput({
     let shouldAdvance = false;
 
     if (part === 'm' || part === 's') {
-      if (digits.length === 1) {
-        const value = Number(digits);
-        if (!Number.isNaN(value) && value > 5) {
-          shouldAdvance = true;
-        }
-      } else if (digits.length === 2) {
+      if (digits.length === 2) {
         const value = Number(digits);
         if (!Number.isNaN(value) && value > 59) {
           next = '59';
@@ -185,7 +186,7 @@ function GoalTimeInput({
     const nextParts = { h, m, s, [part]: next };
     onChange(composeGoalTime(nextParts));
 
-    if (shouldAdvance) {
+    if (shouldAdvance && Platform.OS !== 'web') {
       if (part === 'h') inputRefs.current[1]?.focus();
       if (part === 'm') inputRefs.current[2]?.focus();
     }
@@ -203,6 +204,7 @@ function GoalTimeInput({
           onChangeText={(next) => updatePart('h', next)}
           onBlur={() => blurNormalizePart('h')}
           keyboardType="number-pad"
+          inputMode="numeric"
           maxLength={2}
           placeholder="HH"
           placeholderTextColor={mutedColor}
@@ -217,6 +219,7 @@ function GoalTimeInput({
           onChangeText={(next) => updatePart('m', next)}
           onBlur={() => blurNormalizePart('m')}
           keyboardType="number-pad"
+          inputMode="numeric"
           maxLength={2}
           placeholder="MM"
           placeholderTextColor={mutedColor}
@@ -236,6 +239,7 @@ function GoalTimeInput({
           onChangeText={(next) => updatePart('s', next)}
           onBlur={() => blurNormalizePart('s')}
           keyboardType="number-pad"
+          inputMode="numeric"
           maxLength={2}
           placeholder="SS"
           placeholderTextColor={mutedColor}
@@ -329,7 +333,7 @@ export default function GoalRacesScreen() {
     setEditingId(goal.id);
     setForm({
       title: goal.title,
-      eventDate: goal.event_date,
+      eventDate: normalizeRaceGoalDateInput(goal.event_date),
       priority: (goal.priority as GoalForm['priority'] | null) ?? 'c',
       raceType: goal.race_type ?? '',
       swim: goal.goal_swim_time ?? '',
@@ -353,6 +357,13 @@ export default function GoalRacesScreen() {
   const openDatePicker = () => {
     Keyboard.dismiss();
     const pickerValue = form.eventDate ? new Date(`${form.eventDate}T00:00:00`) : new Date();
+
+    if (Platform.OS === 'web') {
+      openWebDateInput(form.eventDate || normalizeIsoDate(new Date()), (isoDate) => {
+        setForm((prev) => ({ ...prev, eventDate: isoDate }));
+      });
+      return;
+    }
 
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
@@ -686,10 +697,14 @@ export default function GoalRacesScreen() {
                           if (selectedDate) {
                             setIosPickerDate(selectedDate);
                             setForm((prev) => ({ ...prev, eventDate: normalizeIsoDate(selectedDate) }));
-                            setShowDatePicker(false);
                           }
                         }}
                       />
+                      <View style={styles.datePickerActions}>
+                        <Pressable style={styles.datePickerDoneButton} onPress={() => setShowDatePicker(false)}>
+                          <Text style={styles.datePickerDoneText}>Done</Text>
+                        </Pressable>
+                      </View>
                     </View>
                   ) : null}
                 </View>
@@ -1054,6 +1069,26 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       fontFamily: 'DMSans_500Medium',
       fontSize: 11,
       color: theme.textMuted,
+    },
+    datePickerActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: 4,
+    },
+    datePickerDoneButton: {
+      minHeight: 30,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.primary,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.primary,
+    },
+    datePickerDoneText: {
+      fontFamily: 'DMSans_500Medium',
+      fontSize: 11,
+      color: theme.surface,
     },
     modalTitle: {
       fontFamily: 'CormorantGaramond_700Bold',

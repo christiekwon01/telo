@@ -6,7 +6,7 @@ import { Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text,
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useActiveAthlete, useCompletedSessionLogs } from '@/hooks/useSessionData';
-import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps } from '@/lib/dates';
+import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps, openWebDateInput } from '@/lib/dates';
 import { withAlpha } from '@/lib/theme-utils';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -38,6 +38,19 @@ export default function ProgressHistoryScreen() {
   const openDatePicker = (field: 'from' | 'to') => {
     const currentIso = field === 'from' ? fromIso : toIso;
     const value = new Date(`${currentIso}T00:00:00`);
+    if (
+      openWebDateInput(currentIso, (nextIso) => {
+        if (field === 'from') {
+          setFromIso(nextIso);
+          if (nextIso > toIso) setToIso(nextIso);
+        } else {
+          setToIso(nextIso);
+          if (nextIso < fromIso) setFromIso(nextIso);
+        }
+      })
+    ) {
+      return;
+    }
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         ...datePickerAndroidMondayOpenProps(),

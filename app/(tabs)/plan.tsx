@@ -29,11 +29,10 @@ import {
 } from '@/services/racePriority';
 import { usePlanAdjustmentStore } from '@/store/plan-adjustment-store';
 import { supabase } from '@/lib/supabase';
-import { datePickerMondayWeekProps, mondayBasedMonthLeadingDayCount } from '@/lib/dates';
+import { datePickerMondayWeekProps, mondayBasedMonthLeadingDayCount, openWebDateInput } from '@/lib/dates';
 
 type SessionStatus = 'planned' | 'completed' | 'skipped';
 type SessionDotStatus = 'planned' | 'completed';
-type ChallengeStarStatus = 'accepted' | 'completed';
 
 type DayCell = {
   key: string;
@@ -192,11 +191,9 @@ function DragHandleAffordance() {
 function SessionMarkerRow({
   dots,
   raceMarker,
-  challengeStatus,
 }: {
   dots: SessionDotStatus[];
   raceMarker?: RaceMarker;
-  challengeStatus?: ChallengeStarStatus;
 }) {
   const { theme } = useTheme();
   const showRace = Boolean(raceMarker);
@@ -204,7 +201,7 @@ function SessionMarkerRow({
   const showOverflow = dots.length > 3;
   const visibleDots = dots.slice(0, 3);
 
-  if (!showRace && !showDots && !challengeStatus) {
+  if (!showRace && !showDots) {
     return <View style={styles.markerRow} />;
   }
 
@@ -233,17 +230,6 @@ function SessionMarkerRow({
           3+
         </Text>
       ) : null}
-      {challengeStatus ? (
-        <Text
-          style={[
-            styles.challengeStar,
-            { color: theme.accent },
-            challengeStatus === 'accepted' ? styles.challengeStarAccepted : null,
-            challengeStatus === 'accepted' ? { color: withAlpha(theme.accent, 0.45) } : null,
-          ]}>
-          ★
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -261,28 +247,41 @@ function WeekSessionCard({ session, onPress, onLongPress, onDrop, onDragStateCha
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const completed = (session.completionStatus ?? session.status) === 'completed';
+  const canDrag = (session.completionStatus ?? session.status) === 'planned';
+  const isWeb = Platform.OS === 'web';
   const [isActiveDrag, setIsActiveDrag] = useState(false);
+  const [isDragPrimed, setIsDragPrimed] = useState(false);
+  const suppressPressRef = useRef(false);
 
   const resetDragPosition = useCallback(() => {
-    Animated.spring(translateX, {
-      toValue: 0,
-      useNativeDriver: true,
-      bounciness: 5,
-    }).start();
-    Animated.spring(translateY, {
-      toValue: 0,
-      useNativeDriver: true,
-      bounciness: 5,
-    }).start(() => {
+    Animated.parallel([
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 5,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 5,
+      }),
+    ]).start(() => {
       setIsActiveDrag(false);
+      setIsDragPrimed(false);
       onDragStateChange(false);
     });
   }, [onDragStateChange, translateX, translateY]);
 
   const panResponder = useMemo(() => {
     return PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dy) > 5 || Math.abs(gestureState.dx) > 5,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (!canDrag) return false;
+        if (!isWeb && !isDragPrimed) return false;
+        const absDx = Math.abs(gestureState.dx);
+        const absDy = Math.abs(gestureState.dy);
+        // Require a deliberate mostly-vertical gesture so tap/scroll feels natural.
+        return absDy > 12 && absDy > absDx + 4;
+      },
       onPanResponderGrant: () => {
         setIsActiveDrag(true);
         onDragStateChange(true);
@@ -291,14 +290,22 @@ function WeekSessionCard({ session, onPress, onLongPress, onDrop, onDragStateCha
         useNativeDriver: true,
       }),
       onPanResponderRelease: (_, gestureState) => {
-        onDrop(session, gestureState.moveY);
+        suppressPressRef.current = true;
+        setTimeout(() => {
+          suppressPressRef.current = false;
+        }, 220);
+        if (canDrag) onDrop(session, gestureState.moveY);
         resetDragPosition();
       },
       onPanResponderTerminate: () => {
+        suppressPressRef.current = true;
+        setTimeout(() => {
+          suppressPressRef.current = false;
+        }, 220);
         resetDragPosition();
       },
     });
-  }, [onDragStateChange, onDrop, resetDragPosition, session, translateX, translateY]);
+  }, [canDrag, isDragPrimed, isWeb, onDragStateChange, onDrop, resetDragPosition, session, translateX, translateY]);
 
   const panHandlers = panResponder?.panHandlers ?? {};
 
@@ -316,15 +323,32 @@ function WeekSessionCard({ session, onPress, onLongPress, onDrop, onDragStateCha
       {...panHandlers}>
       <Pressable
         style={styles.weekSessionPressable}
+        onPressIn={() => {
+          if (isWeb && canDrag) {
+            setIsDragPrimed(true);
+          }
+        }}
+        onPressOut={() => {
+          if (isWeb && !isActiveDrag) {
+            setIsDragPrimed(false);
+          }
+        }}
         onPress={() => {
+          if (isActiveDrag || isDragPrimed || suppressPressRef.current) return;
           if (session.id) {
             onPress(session.id);
           }
         }}
         onLongPress={() => {
-          if (session.id) {
-            onLongPress?.(session.id);
+          if (!canDrag) {
+            if (session.id) onLongPress?.(session.id);
+            return;
           }
+          setIsDragPrimed(true);
+          suppressPressRef.current = true;
+          setTimeout(() => {
+            suppressPressRef.current = false;
+          }, 260);
         }}>
         {completed ? (
           <View style={styles.weekSessionCheckCol}>
@@ -357,7 +381,7 @@ function WeekSessionCard({ session, onPress, onLongPress, onDrop, onDragStateCha
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.2)} />
-        <DragHandleAffordance />
+        {canDrag ? <DragHandleAffordance /> : null}
       </Pressable>
     </Animated.View>
   );
@@ -376,7 +400,6 @@ export default function PlanScreen() {
   });
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [selectedDate, setSelectedDate] = useState(() => toIsoDate(new Date()));
-  const [challengeStarsByDate, setChallengeStarsByDate] = useState<Record<string, ChallengeStarStatus>>({});
   const [raceLoading, setRaceLoading] = useState(true);
   const [weekError, setWeekError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -424,29 +447,11 @@ export default function PlanScreen() {
   const refreshRaces = useCallback(async () => {
     setRaceLoading(true);
     try {
-      const fromDate = toIsoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1));
-      const toDate = toIsoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 0));
-      const challengeResult = athlete?.id
-        ? await supabase
-            .from('rova_challenges')
-            .select('scheduled_date,status')
-            .eq('athlete_id', athlete.id)
-            .gte('scheduled_date', fromDate)
-            .lte('scheduled_date', toDate)
-            .in('status', ['pending', 'accepted', 'completed'])
-        : ({ data: [], error: null } as any);
-      const challengeByDate: Record<string, ChallengeStarStatus> = {};
-      for (const row of challengeResult.data ?? []) {
-        const status = row.status as ChallengeStarStatus;
-        const existing = challengeByDate[row.scheduled_date];
-        if (existing === 'completed') continue;
-        challengeByDate[row.scheduled_date] = status === 'completed' ? 'completed' : 'accepted';
-      }
-      setChallengeStarsByDate(challengeByDate);
+      // Keep loading state parity with other refresh hooks.
     } finally {
       setRaceLoading(false);
     }
-  }, [athlete?.id, monthAnchor]);
+  }, []);
 
   useEffect(() => {
     void refreshRaces();
@@ -568,6 +573,16 @@ export default function PlanScreen() {
   };
 
   const openWeekPicker = () => {
+    if (
+      openWebDateInput(toIsoDate(weekStart), (isoDate) => {
+        const [y, m, d] = isoDate.split('-').map(Number);
+        const selected = new Date(y, m - 1, d);
+        setWeekPickerDate(selected);
+        applyWeekPickerDate(selected);
+      })
+    ) {
+      return;
+    }
     setWeekPickerDate(new Date(weekStart));
     setWeekPickerOpen(true);
   };
@@ -618,13 +633,22 @@ export default function PlanScreen() {
   );
 
   const resolveDropDay = (dropY: number): string | null => {
+    let nearestDay: string | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
     for (const dayIso of weekDates) {
       const layout = dayBucketLayouts.current[dayIso];
-      if (layout && dropY >= layout.y && dropY <= layout.y + layout.height) {
+      if (!layout) continue;
+      if (dropY >= layout.y && dropY <= layout.y + layout.height) {
         return dayIso;
       }
+      const center = layout.y + layout.height / 2;
+      const distance = Math.abs(dropY - center);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestDay = dayIso;
+      }
     }
-    return null;
+    return nearestDay;
   };
 
   const collectBucketLayouts = () => {
@@ -761,7 +785,6 @@ export default function PlanScreen() {
       calendarRaceBorder: { borderColor: theme.primary },
       markerPlanned: { backgroundColor: theme.primary },
       markerCompleted: { backgroundColor: theme.accent },
-      challengeDone: { color: theme.accent },
       weekNotice: { color: theme.accent },
       draggingBorder: { borderColor: withAlpha(theme.accent, 0.35) },
       raceBadge: { borderColor: withAlpha(theme.primary, 0.2), backgroundColor: withAlpha(theme.primary, 0.08) },
@@ -784,7 +807,7 @@ export default function PlanScreen() {
       <StatusAreaFade height={insets.top + 8} />
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }, Platform.OS === 'web' ? styles.webContent : null]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isDragging}
         scrollEventThrottle={16}
@@ -891,7 +914,6 @@ export default function PlanScreen() {
                 const raceMarker = hasRace ? raceMarkerForPriority(races[0]?.priority) : undefined;
                 const isSelected = item.isoDate === selectedDate;
                 const isToday = item.isoDate === todayIso;
-                const challengeStatus = item.isoDate ? challengeStarsByDate[item.isoDate] : undefined;
 
                 return (
                   <Pressable
@@ -927,7 +949,7 @@ export default function PlanScreen() {
                       ]}>
                       {item.dayNumber ?? ''}
                     </Text>
-                    {item.isoDate ? <SessionMarkerRow dots={dots} raceMarker={raceMarker} challengeStatus={challengeStatus} /> : null}
+                    {item.isoDate ? <SessionMarkerRow dots={dots} raceMarker={raceMarker} /> : null}
                   </Pressable>
                 );
               })}
@@ -954,10 +976,6 @@ export default function PlanScreen() {
                 <View style={[styles.racePriorityDot, { backgroundColor: '#B16C3D' }]} />
                 <Text style={[styles.legendText, themed.subtleText]}>C race</Text>
               </View>
-              <View style={styles.legendItem}>
-                <Text style={[styles.challengeStar, styles.legendStar, themed.challengeDone]}>★</Text>
-                <Text style={[styles.legendText, themed.subtleText]}>Wild done</Text>
-              </View>
             </View>
 
           </View>
@@ -976,7 +994,7 @@ export default function PlanScreen() {
                 <Pressable hitSlop={10} onPress={goPrevWeek} style={[styles.weekNavBtn, themed.weekNavBtn]}>
                   <Ionicons name="chevron-back" size={14} color={theme.primary} />
                 </Pressable>
-                <Pressable hitSlop={10} onPress={openWeekPicker}>
+                <Pressable hitSlop={12} onPress={openWeekPicker} style={styles.weekNavLabelButton}>
                   <Text style={[styles.weekNavLabel, themed.subtleText]}>{weekRangeLabel}</Text>
                 </Pressable>
                 <Pressable hitSlop={10} onPress={goNextWeek} style={[styles.weekNavBtn, themed.weekNavBtn]}>
@@ -1262,11 +1280,6 @@ const styles = StyleSheet.create({
     paddingBottom: 130,
     gap: 16,
   },
-  webContent: {
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
-  },
   compactHeaderText: {
     fontFamily: 'CormorantGaramond_700Bold',
     fontSize: 22,
@@ -1540,21 +1553,6 @@ const styles = StyleSheet.create({
     color: '#0F2840',
     marginLeft: 1,
   },
-  challengeStar: {
-    fontFamily: 'DMSans_700Bold',
-    fontSize: 8,
-    color: '#C97E2F',
-    marginLeft: 2,
-    lineHeight: 9,
-  },
-  challengeStarAccepted: {
-    color: 'rgba(201,126,47,0.45)',
-  },
-  legendStar: {
-    fontSize: 10,
-    lineHeight: 10,
-    marginLeft: 0,
-  },
   legendRow: {
     marginTop: 4,
     flexDirection: 'row',
@@ -1686,6 +1684,13 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_400Regular',
     fontSize: 11,
     color: 'rgba(15,40,64,0.55)',
+  },
+  weekNavLabelButton: {
+    minHeight: 28,
+    minWidth: 170,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   weekPickerBackdrop: {
     ...StyleSheet.absoluteFillObject,

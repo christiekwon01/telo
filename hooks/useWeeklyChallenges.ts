@@ -1,18 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { toLocalIsoDate } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 import { generateWeeklyChallenges } from '@/services/generateWeeklyChallenges';
 import { saveChallenges } from '@/services/saveChallenges';
 
 const LAST_GENERATED_KEY = 'telo:rova:last-generated-at';
-
-function toIsoDate(value: Date) {
-  const year = value.getFullYear();
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function isMondayWindow(now: Date) {
   return now.getDay() === 1 || now.getDay() === 0;
@@ -57,7 +51,7 @@ export function useWeeklyChallenges(athleteId: string | null | undefined) {
     return true;
   }, [athleteId, generateNow]);
 
-  const todayIso = toIsoDate(new Date());
+  const todayIso = toLocalIsoDate(new Date());
   const todaysChallenge = useQuery({
     queryKey: ['rova_challenges', 'today', athleteId ?? 'none', todayIso] as const,
     enabled: Boolean(athleteId),

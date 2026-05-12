@@ -197,12 +197,16 @@ export default function TemplatePlanScreen() {
         raceDate,
         raceName,
         trainingDays,
+        replaceFuturePlannedOnly: true,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['sessions'] }),
         queryClient.invalidateQueries({ queryKey: ['plan'] }),
       ]);
-      Alert.alert('Plan updated', 'Telo’s built-in template has been re-applied. You can still edit the text draft below and apply your own rows.');
+      Alert.alert(
+        'Plan updated',
+        'Telo’s built-in template has been re-applied. Only future planned sessions were replaced; completed sessions were kept.'
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       Alert.alert('Could not update plan', message);

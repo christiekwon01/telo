@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
+import { sessionQueryKeys } from '@/hooks/useSessionData';
 import { useTheme } from '@/contexts/ThemeContext';
 import { withAlpha } from '@/lib/theme-utils';
 import { supabase } from '@/lib/supabase';
@@ -199,8 +200,13 @@ export function FlexWeekSheet({
         reshuffledPlan,
         overrideLimit: allowOverride,
       });
-      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      await queryClient.invalidateQueries({ queryKey: sessionQueryKeys.all });
       await queryClient.invalidateQueries({ queryKey: ['plan'] });
+      await queryClient.invalidateQueries({ queryKey: ['rova_challenges'] });
+      await queryClient.invalidateQueries({ queryKey: ['session_logs'] });
+      if (athleteId) {
+        await queryClient.invalidateQueries({ queryKey: sessionQueryKeys.personalBests(athleteId) });
+      }
       showToast('Week reshuffled successfully');
       closeSheet();
     } catch (error) {
@@ -479,14 +485,14 @@ const styles = StyleSheet.create({
   title: { textAlign: 'center', fontFamily: 'CormorantGaramond_700Bold', fontSize: 34, color: '#0F2840', marginBottom: 8 },
   description: {
     textAlign: 'center',
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     lineHeight: 19,
     color: 'rgba(15,40,64,0.55)',
     marginBottom: 14,
   },
   sectionLabel: {
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'DMSans-SemiBold',
     fontSize: 11,
     color: '#C97E2F',
     letterSpacing: 0.9,
@@ -511,7 +517,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   chipActive: { backgroundColor: '#0F2840', borderColor: '#0F2840' },
-  chipText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#0F2840' },
+  chipText: { fontFamily: 'DMSans-Medium', fontSize: 12, color: '#0F2840' },
   chipTextActive: { color: '#F6F3EE' },
   tiredRow: { flexDirection: 'row', gap: 8 },
   tiredPill: {
@@ -532,16 +538,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans-Regular',
     fontSize: 13,
     color: '#0F2840',
   },
-  previewBullet: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(15,40,64,0.62)', marginBottom: 4 },
-  warningText: { marginTop: 10, fontFamily: 'DMSans_500Medium', fontSize: 11, color: '#C97E2F' },
+  previewBullet: { fontFamily: 'DMSans-Regular', fontSize: 12, color: 'rgba(15,40,64,0.62)', marginBottom: 4 },
+  warningText: { marginTop: 10, fontFamily: 'DMSans-Medium', fontSize: 11, color: '#C97E2F' },
   overrideRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
   overrideDot: { width: 12, height: 12, borderRadius: 6, borderWidth: 1.2, borderColor: '#0F2840' },
   overrideDotActive: { backgroundColor: '#0F2840' },
-  overrideText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#0F2840' },
+  overrideText: { fontFamily: 'DMSans-Regular', fontSize: 12, color: '#0F2840' },
   primaryButton: {
     width: '100%',
     borderRadius: 999,
@@ -551,7 +557,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   disabledButton: { opacity: 0.6 },
-  primaryButtonText: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: '#F6F3EE' },
+  primaryButtonText: { fontFamily: 'DMSans-Medium', fontSize: 14, color: '#F6F3EE' },
   secondaryButton: {
     width: '100%',
     borderRadius: 999,
@@ -561,11 +567,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  secondaryButtonText: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: '#0F2840' },
+  secondaryButtonText: { fontFamily: 'DMSans-Medium', fontSize: 13, color: '#0F2840' },
   cancelText: {
     marginTop: 10,
     textAlign: 'center',
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans-Medium',
     fontSize: 14,
     color: 'rgba(15,40,64,0.45)',
   },
@@ -577,9 +583,9 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 8,
   },
-  fallbackBannerText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#0F2840', lineHeight: 18 },
-  manualLink: { marginTop: 6, fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#0F2840', textDecorationLine: 'underline' },
-  emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(15,40,64,0.5)' },
+  fallbackBannerText: { fontFamily: 'DMSans-Regular', fontSize: 12, color: '#0F2840', lineHeight: 18 },
+  manualLink: { marginTop: 6, fontFamily: 'DMSans-Medium', fontSize: 12, color: '#0F2840', textDecorationLine: 'underline' },
+  emptyText: { fontFamily: 'DMSans-Regular', fontSize: 12, color: 'rgba(15,40,64,0.5)' },
   rowCard: {
     borderRadius: 10,
     borderWidth: 1,
@@ -590,8 +596,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   deemphasized: { opacity: 0.65 },
-  rowTitle: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#0F2840' },
-  rowMeta: { marginTop: 3, fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(15,40,64,0.55)' },
+  rowTitle: { fontFamily: 'DMSans-Medium', fontSize: 12, color: '#0F2840' },
+  rowMeta: { marginTop: 3, fontFamily: 'DMSans-Regular', fontSize: 11, color: 'rgba(15,40,64,0.55)' },
   comparisonWrap: {
     borderRadius: 10,
     borderWidth: 1,
@@ -601,6 +607,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   compareRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  compareDay: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#0F2840' },
-  compareValue: { fontFamily: 'DMSans_500Medium', fontSize: 11, color: 'rgba(15,40,64,0.65)' },
+  compareDay: { fontFamily: 'DMSans-Regular', fontSize: 11, color: '#0F2840' },
+  compareValue: { fontFamily: 'DMSans-Medium', fontSize: 11, color: 'rgba(15,40,64,0.65)' },
 });

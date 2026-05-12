@@ -50,3 +50,37 @@ export function datePickerAndroidMondayOpenProps(): { firstDayOfWeek: typeof AND
 export function mondayBasedMonthLeadingDayCount(startOfMonth: Date): number {
   return (startOfMonth.getDay() + 6) % 7;
 }
+
+/**
+ * Opens a native browser date picker on web (`<input type="date">`).
+ * Returns true when the picker was opened; false for non-web platforms.
+ */
+export function openWebDateInput(currentIsoDate: string | undefined, onPick: (isoDate: string) => void): boolean {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return false;
+  const input = document.createElement('input');
+  input.type = 'date';
+  if (currentIsoDate) input.value = currentIsoDate;
+  input.style.position = 'fixed';
+  input.style.left = '-9999px';
+  input.style.opacity = '0';
+  input.style.pointerEvents = 'none';
+
+  const cleanup = () => {
+    if (input.parentElement) input.parentElement.removeChild(input);
+  };
+
+  input.onchange = () => {
+    if (input.value) onPick(input.value);
+    cleanup();
+  };
+  input.onblur = cleanup;
+
+  document.body.appendChild(input);
+  input.focus();
+  if ('showPicker' in input && typeof input.showPicker === 'function') {
+    input.showPicker();
+  } else {
+    input.click();
+  }
+  return true;
+}

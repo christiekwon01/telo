@@ -1,6 +1,6 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -36,7 +36,7 @@ import {
   useWeekSessions,
 } from '@/hooks/useSessionData';
 import { withAlpha } from '@/lib/theme-utils';
-import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps } from '@/lib/dates';
+import { datePickerAndroidMondayOpenProps, datePickerMondayWeekProps, openWebDateInput } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 import {
   PERSONAL_BEST_CATALOG,
@@ -219,21 +219,6 @@ export default function ProgressScreen() {
   const { data: pbRows = [] } = usePersonalBests(athleteId);
   const { data: pbLogs = [] } = usePersonalBestSessionLogs(athleteId);
 
-  const { data: wildCards = [] } = useQuery({
-    queryKey: ['rova_challenges', 'counts', athleteId ?? 'none', fromIso, toIso] as const,
-    enabled: Boolean(athleteId),
-    queryFn: async () => {
-      if (!athleteId) return [];
-      const { data, error } = await supabase
-        .from('rova_challenges')
-        .select('status')
-        .eq('athlete_id', athleteId)
-        .gte('scheduled_date', fromIso)
-        .lte('scheduled_date', toIso);
-      if (error) throw new Error(error.message);
-      return data ?? [];
-    },
-  });
 
   const weeklyMomentum = useMemo(() => {
     const sessions = weekDates.flatMap((date) => weekSessionsByDate[date] ?? []);
@@ -315,12 +300,6 @@ export default function ProgressScreen() {
       recent,
     };
   }, [logs]);
-
-  const wildStats = useMemo(() => {
-    const total = wildCards.length;
-    const done = wildCards.filter((c: any) => c.status === 'completed').length;
-    return { done, percent: total > 0 ? Math.round((done / total) * 100) : 0 };
-  }, [wildCards]);
 
   const customPbRows = useMemo(
     () => pbRows.filter((row) => !PERSONAL_BEST_CATALOG.some((e) => matchesCatalog(row, e))),
@@ -521,6 +500,13 @@ export default function ProgressScreen() {
   const openAchievedDatePicker = () => {
     Keyboard.dismiss();
     const value = new Date(`${achievedDateIso}T12:00:00`);
+    if (
+      openWebDateInput(achievedDateIso, (isoDate) => {
+        setAchievedDateIso(isoDate);
+      })
+    ) {
+      return;
+    }
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         ...datePickerAndroidMondayOpenProps(),
@@ -544,7 +530,7 @@ export default function ProgressScreen() {
       <StatusAreaFade height={insets.top + 8} />
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={[styles.content, Platform.OS === 'web' ? styles.webContent : null]}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}>
         <TabHeader title="Progress" paddingHorizontal={0} />
@@ -699,12 +685,6 @@ export default function ProgressScreen() {
                 </Pressable>
               ) : null}
 
-              <View style={styles.rowSpread}>
-                <Text style={styles.metricTitle}>Rova wild cards completed</Text>
-                <Text style={styles.metricValue}>
-                  {wildStats.done} ({wildStats.percent}%)
-                </Text>
-              </View>
             </>
           ) : null}
         </View>
@@ -896,7 +876,6 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: theme.base },
     content: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 140, gap: 14 },
-    webContent: { width: '100%', maxWidth: 800, alignSelf: 'center' },
     segmentWrap: {
       marginTop: -2,
       flexDirection: 'row',

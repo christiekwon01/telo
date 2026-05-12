@@ -16,7 +16,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { datePickerMondayWeekProps } from '@/lib/dates';
+import { datePickerMondayWeekProps, openWebDateInput } from '@/lib/dates';
+import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { withAlpha } from '@/lib/theme-utils';
 import { getSportIcon } from '@/components/sport-icon';
@@ -98,6 +99,7 @@ export function ImportPlanSheet({
   initialDate,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const sheetY = useRef(new Animated.Value(720)).current;
   const [mode, setMode] = useState<Mode>(initialMode);
   const [templateText, setTemplateText] = useState('');
@@ -377,6 +379,17 @@ export function ImportPlanSheet({
     void updateConflictDates(next);
   };
 
+  const openManualDatePicker = () => {
+    if (
+      openWebDateInput(manualDate, (isoDate) => {
+        setManualDate(isoDate);
+      })
+    ) {
+      return;
+    }
+    setShowDatePicker(true);
+  };
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -384,79 +397,92 @@ export function ImportPlanSheet({
         overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
         sheet: {
           maxHeight: '95%',
-          backgroundColor: '#F6F3EE',
+          backgroundColor: theme.base,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           paddingHorizontal: 20,
           paddingTop: 10,
         },
-        handle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 999, backgroundColor: 'rgba(15,40,64,0.2)' },
+        handle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 999, backgroundColor: withAlpha(theme.primary, 0.2) },
         close: { position: 'absolute', right: 12, top: 10, padding: 8, zIndex: 2 },
-        title: { marginTop: 10, textAlign: 'center', fontFamily: 'CormorantGaramond_700Bold', fontSize: 28, color: '#0F2840' },
-        subtitle: { textAlign: 'center', marginTop: 6, marginBottom: 12, fontFamily: 'DMSans_400Regular', fontSize: 13, color: 'rgba(15,40,64,0.5)' },
-        tabRow: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(15,40,64,0.12)', padding: 4, backgroundColor: '#F6F3EE' },
+        title: { marginTop: 10, textAlign: 'center', fontFamily: 'CormorantGaramond_700Bold', fontSize: 28, color: theme.primary },
+        subtitle: { textAlign: 'center', marginTop: 6, marginBottom: 12, fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.textMuted },
+        tabRow: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, borderColor: withAlpha(theme.primary, 0.12), padding: 4, backgroundColor: theme.base },
         tab: { flex: 1, borderRadius: 9, height: 34, alignItems: 'center', justifyContent: 'center' },
-        tabActive: { backgroundColor: '#0F2840' },
-        tabText: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: 'rgba(15,40,64,0.65)' },
-        tabTextActive: { color: '#FFFFFF' },
+        tabActive: { backgroundColor: theme.primary },
+        tabText: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: withAlpha(theme.primary, 0.65) },
+        tabTextActive: { color: theme.onPrimary },
         sectionCard: {
           marginTop: 12,
           borderRadius: 12,
           borderWidth: 1,
-          borderColor: 'rgba(15,40,64,0.12)',
-          backgroundColor: '#FFFFFF',
+          borderColor: withAlpha(theme.primary, 0.12),
+          backgroundColor: theme.surface,
           padding: 10,
         },
         instructions: {
           borderLeftWidth: 4,
-          borderLeftColor: '#C97E2F',
+          borderLeftColor: theme.accent,
           borderRadius: 8,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.surface,
           padding: 10,
           marginTop: 12,
         },
-        instructionsText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(15,40,64,0.6)', lineHeight: 18 },
-        textAreaWrap: { marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,40,64,0.15)', backgroundColor: '#F6F3EE', minHeight: 210, overflow: 'hidden', flexDirection: 'row' },
-        textStrip: { width: 4, backgroundColor: '#C97E2F' },
-        textArea: { flex: 1, minHeight: 210, textAlignVertical: 'top', padding: 10, fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }), fontSize: 12, color: '#0F2840' },
+        instructionsText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted, lineHeight: 18 },
+        textAreaWrap: { marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(theme.primary, 0.15), backgroundColor: theme.base, minHeight: 210, overflow: 'hidden', flexDirection: 'row' },
+        textStrip: { width: 4, backgroundColor: theme.accent },
+        textArea: { flex: 1, minHeight: 210, textAlignVertical: 'top', padding: 10, fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }), fontSize: 12, color: theme.text },
         copyBtn: { alignSelf: 'flex-end', marginTop: 8 },
-        copyText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#C97E2F' },
-        fullBtn: { marginTop: 10, height: 44, borderRadius: 999, backgroundColor: '#0F2840', alignItems: 'center', justifyContent: 'center' },
-        fullBtnText: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: '#FFFFFF' },
-        label: { marginTop: 10, marginBottom: 6, fontFamily: 'DMSans_500Medium', fontSize: 10, letterSpacing: 0.7, color: '#C97E2F', textTransform: 'uppercase' },
-        input: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,40,64,0.15)', backgroundColor: '#F6F3EE', paddingHorizontal: 10, fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#0F2840' },
+        copyText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.accent },
+        fullBtn: { marginTop: 10, height: 44, borderRadius: 999, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center' },
+        fullBtnText: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.onPrimary },
+        label: { marginTop: 10, marginBottom: 6, fontFamily: 'DMSans_500Medium', fontSize: 10, letterSpacing: 0.7, color: theme.accent, textTransform: 'uppercase' },
+        input: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(theme.primary, 0.15), backgroundColor: theme.base, paddingHorizontal: 10, fontFamily: 'DMSans_400Regular', fontSize: 14, color: theme.text },
+        /** Pressable date row: same chrome as `input` but vertically centers label (web + native). */
+        dateInputPressable: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        inputCenteredText: {
+          fontFamily: 'DMSans_400Regular',
+          fontSize: 14,
+          lineHeight: 14,
+          color: theme.text,
+          textAlign: 'center',
+          includeFontPadding: false,
+        },
         row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
         pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-        pill: { borderRadius: 999, borderWidth: 1, borderColor: 'rgba(15,40,64,0.2)', paddingHorizontal: 12, height: 34, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F3EE' },
-        pillSelected: { backgroundColor: '#0F2840', borderColor: '#0F2840' },
-        pillText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#0F2840' },
-        pillTextSelected: { color: '#FFFFFF' },
-        blockHeading: { marginTop: 14, fontFamily: 'CormorantGaramond_700Bold', fontSize: 20, color: '#0F2840' },
-        blockSub: { marginTop: 2, fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(15,40,64,0.5)' },
-        blockCard: { marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,40,64,0.12)', backgroundColor: '#FFFFFF' },
+        pill: { borderRadius: 999, borderWidth: 1, borderColor: withAlpha(theme.primary, 0.2), paddingHorizontal: 12, height: 34, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.base },
+        pillSelected: { backgroundColor: theme.primary, borderColor: theme.primary },
+        pillText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.text },
+        pillTextSelected: { color: theme.onPrimary },
+        blockHeading: { marginTop: 14, fontFamily: 'CormorantGaramond_700Bold', fontSize: 20, color: theme.text },
+        blockSub: { marginTop: 2, fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted },
+        blockCard: { marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(theme.primary, 0.12), backgroundColor: theme.surface },
         blockHead: { minHeight: 42, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-        blockTitle: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: '#0F2840' },
+        blockTitle: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.text },
         stepRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingBottom: 8 },
-        stepInput: { flex: 1, minHeight: 38, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(15,40,64,0.12)', backgroundColor: '#F6F3EE', paddingHorizontal: 10, fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#0F2840' },
+        stepInput: { flex: 1, minHeight: 38, borderRadius: 8, borderWidth: 1, borderColor: withAlpha(theme.primary, 0.12), backgroundColor: theme.base, paddingHorizontal: 10, fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text },
         link: { paddingHorizontal: 10, paddingBottom: 8 },
-        linkText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#C97E2F' },
-        previewTitle: { marginTop: 16, fontFamily: 'CormorantGaramond_700Bold', fontSize: 24, color: '#0F2840' },
-        previewSub: { marginTop: 2, fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(15,40,64,0.5)' },
-        warnBanner: { marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: withAlpha('#C97E2F', 0.5), backgroundColor: withAlpha('#C97E2F', 0.12), padding: 10 },
-        warnText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#0F2840' },
-        previewCard: { marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,40,64,0.1)', backgroundColor: '#FFFFFF', padding: 10 },
-        previewMeta: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#C97E2F' },
+        linkText: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.accent },
+        previewTitle: { marginTop: 16, fontFamily: 'CormorantGaramond_700Bold', fontSize: 24, color: theme.text },
+        previewSub: { marginTop: 2, fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted },
+        warnBanner: { marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(theme.accent, 0.5), backgroundColor: withAlpha(theme.accent, 0.12), padding: 10 },
+        warnText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.text },
+        previewCard: { marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(theme.primary, 0.1), backgroundColor: theme.surface, padding: 10 },
+        previewMeta: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.accent },
         previewHeader: { marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 8 },
-        iconWrap: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#0F2840', alignItems: 'center', justifyContent: 'center' },
-        previewTitleText: { flex: 1, fontFamily: 'DMSans_500Medium', fontSize: 14, color: '#0F2840' },
-        previewSmall: { marginTop: 2, fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(15,40,64,0.45)' },
-        previewExpand: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(15,40,64,0.08)' },
-        previewBlockTitle: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: '#0F2840', marginBottom: 4 },
-        previewStep: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(15,40,64,0.65)', marginBottom: 2 },
-        issue: { marginTop: 6, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(201,64,64,0.5)', backgroundColor: 'rgba(201,64,64,0.08)', padding: 8 },
-        issueText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#8A1F1F' },
+        iconWrap: { width: 28, height: 28, borderRadius: 14, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center' },
+        previewTitleText: { flex: 1, fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.text },
+        previewSmall: { marginTop: 2, fontFamily: 'DMSans_400Regular', fontSize: 12, color: withAlpha(theme.text, 0.55) },
+        previewExpand: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: withAlpha(theme.primary, 0.08) },
+        previewBlockTitle: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.text, marginBottom: 4 },
+        previewStep: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: withAlpha(theme.text, 0.7), marginBottom: 2 },
+        issue: { marginTop: 6, borderRadius: 8, borderWidth: 1, borderColor: withAlpha(theme.danger, 0.5), backgroundColor: withAlpha(theme.danger, 0.08), padding: 8 },
+        issueText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.danger },
       }),
-    []
+    [theme]
   );
 
   return (
@@ -470,7 +496,7 @@ export function ImportPlanSheet({
           ]}>
           <View style={styles.handle} />
           <Pressable style={styles.close} onPress={closeSheet}>
-            <Ionicons name="close" size={18} color="#0F2840" />
+            <Ionicons name="close" size={18} color={theme.text} />
           </Pressable>
           <Text style={styles.title}>{editingSessionId ? 'Edit session' : 'Import training plan'}</Text>
           <Text style={styles.subtitle}>Add sessions from an existing plan</Text>
@@ -513,7 +539,7 @@ export function ImportPlanSheet({
                     onChangeText={setTemplateText}
                     style={styles.textArea}
                     placeholder={templateImportExample()}
-                    placeholderTextColor="rgba(15,40,64,0.35)"
+                    placeholderTextColor={withAlpha(theme.text, 0.45)}
                   />
                 </View>
                 <Pressable style={styles.fullBtn} onPress={() => void onParseTemplate()}>
@@ -530,10 +556,10 @@ export function ImportPlanSheet({
             ) : (
               <>
                 <Text style={styles.label}>Date</Text>
-                <Pressable style={styles.input} onPress={() => setShowDatePicker(true)}>
-                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#0F2840' }}>{manualDate}</Text>
+                <Pressable style={[styles.input, styles.dateInputPressable]} onPress={openManualDatePicker}>
+                  <Text style={styles.inputCenteredText}>{manualDate}</Text>
                 </Pressable>
-                {showDatePicker ? (
+                {showDatePicker && Platform.OS !== 'web' ? (
                   <DateTimePicker
                     {...datePickerMondayWeekProps()}
                     value={new Date(`${manualDate}T00:00:00`)}
@@ -556,7 +582,13 @@ export function ImportPlanSheet({
                 </View>
 
                 <Text style={styles.label}>Session title</Text>
-                <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Threshold intervals" placeholderTextColor="rgba(15,40,64,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="e.g. Threshold intervals"
+                  placeholderTextColor={withAlpha(theme.text, 0.45)}
+                />
 
                 <Text style={styles.label}>Duration</Text>
                 <View style={styles.row}>
@@ -600,10 +632,22 @@ export function ImportPlanSheet({
                 </View>
 
                 <Text style={styles.label}>Description</Text>
-                <TextInput style={styles.input} value={description} onChangeText={setDescription} placeholder="Brief overview of the session" placeholderTextColor="rgba(15,40,64,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="Brief overview of the session"
+                  placeholderTextColor={withAlpha(theme.text, 0.45)}
+                />
 
                 <Text style={styles.label}>Coach note</Text>
-                <TextInput style={styles.input} value={coachNote} onChangeText={setCoachNote} placeholder="Why this session matters" placeholderTextColor="rgba(15,40,64,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  value={coachNote}
+                  onChangeText={setCoachNote}
+                  placeholder="Why this session matters"
+                  placeholderTextColor={withAlpha(theme.text, 0.45)}
+                />
 
                 <Text style={styles.blockHeading}>Session blocks</Text>
                 <Text style={styles.blockSub}>Add warmup, main set, and cooldown</Text>
@@ -617,12 +661,12 @@ export function ImportPlanSheet({
                         )
                       }>
                       <Text style={styles.blockTitle}>{block.title}</Text>
-                      <Ionicons name={block.expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#0F2840" />
+                      <Ionicons name={block.expanded ? 'chevron-up' : 'chevron-down'} size={16} color={theme.text} />
                     </Pressable>
                     {block.expanded
                       ? block.steps.map((step, stepIdx) => (
                           <View key={`${block.key}-step-${stepIdx}`} style={styles.stepRow}>
-                            <Ionicons name="reorder-three" size={16} color={withAlpha('#0F2840', 0.45)} />
+                            <Ionicons name="reorder-three" size={16} color={withAlpha(theme.text, 0.45)} />
                             <TextInput
                               style={styles.stepInput}
                               value={step}
@@ -635,7 +679,7 @@ export function ImportPlanSheet({
                                 })
                               }
                               placeholder="Step instruction"
-                              placeholderTextColor="rgba(15,40,64,0.35)"
+                              placeholderTextColor={withAlpha(theme.text, 0.45)}
                             />
                             <Pressable
                               onPress={() =>
@@ -649,7 +693,7 @@ export function ImportPlanSheet({
                                   return next;
                                 })
                               }>
-                              <Ionicons name="arrow-up" size={14} color="#0F2840" />
+                              <Ionicons name="arrow-up" size={14} color={theme.text} />
                             </Pressable>
                             <Pressable
                               onPress={() =>
@@ -663,7 +707,7 @@ export function ImportPlanSheet({
                                   return next;
                                 })
                               }>
-                              <Ionicons name="arrow-down" size={14} color="#0F2840" />
+                              <Ionicons name="arrow-down" size={14} color={theme.text} />
                             </Pressable>
                             <Pressable
                               onPress={() =>
@@ -676,7 +720,7 @@ export function ImportPlanSheet({
                                   return next;
                                 })
                               }>
-                              <Ionicons name="close" size={16} color="#0F2840" />
+                              <Ionicons name="close" size={16} color={theme.text} />
                             </Pressable>
                           </View>
                         ))
@@ -707,24 +751,24 @@ export function ImportPlanSheet({
                   <Text style={styles.linkText}>Add custom block</Text>
                 </Pressable>
 
-                <Text style={[styles.label, { fontSize: 13, textTransform: 'none', letterSpacing: 0, marginTop: 14, marginBottom: 8, color: '#0F2840' }]}>
+                <Text style={[styles.label, { fontSize: 13, textTransform: 'none', letterSpacing: 0, marginTop: 14, marginBottom: 8, color: theme.text }]}>
                   Repeat
                 </Text>
                 <Pressable style={styles.row} onPress={() => setRepeatOn((prev) => !prev)}>
-                  <Ionicons name={repeatOn ? 'checkbox' : 'square-outline'} size={18} color={repeatOn ? '#C97E2F' : '#0F2840'} />
-                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#0F2840' }}>Repeat this session</Text>
+                  <Ionicons name={repeatOn ? 'checkbox' : 'square-outline'} size={18} color={repeatOn ? theme.accent : theme.text} />
+                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text }}>Repeat this session</Text>
                 </Pressable>
                 {repeatOn ? (
                   <>
                     <View style={[styles.row, { marginTop: 8 }]}>
-                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#0F2840' }}>Repeat every</Text>
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text }}>Repeat every</Text>
                       <TextInput style={[styles.input, { flex: 0, minWidth: 60 }]} value={repeatEveryDays} onChangeText={setRepeatEveryDays} keyboardType="number-pad" />
-                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#0F2840' }}>days</Text>
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text }}>days</Text>
                     </View>
                     <View style={[styles.row, { marginTop: 8 }]}>
-                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#0F2840' }}>For</Text>
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text }}>For</Text>
                       <TextInput style={[styles.input, { flex: 0, minWidth: 60 }]} value={repeatWeeks} onChangeText={setRepeatWeeks} keyboardType="number-pad" />
-                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#0F2840' }}>weeks</Text>
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text }}>weeks</Text>
                     </View>
                     <Text style={styles.previewSmall}>{repeatPreview}</Text>
                   </>
@@ -768,7 +812,7 @@ export function ImportPlanSheet({
                       <Pressable onPress={() => togglePreviewExpanded(pkey)}>
                         <Text style={styles.previewMeta}>{toShortPreview(session.date)}</Text>
                         <View style={styles.previewHeader}>
-                          <View style={styles.iconWrap}>{getSportIcon(session.sport, 14, '#F6F3EE')}</View>
+                          <View style={styles.iconWrap}>{getSportIcon(session.sport, 14, theme.onPrimary)}</View>
                           <Text style={styles.previewTitleText}>{session.title}</Text>
                         </View>
                         <Text style={styles.previewSmall}>
@@ -777,10 +821,10 @@ export function ImportPlanSheet({
                       </Pressable>
                       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 6 }}>
                         <Pressable hitSlop={8} onPress={() => applyParsedSessionToManual(session)}>
-                          <Ionicons name="pencil" size={16} color="#0F2840" />
+                          <Ionicons name="pencil" size={16} color={theme.text} />
                         </Pressable>
                         <Pressable hitSlop={8} onPress={() => removePreviewSession(index)}>
-                          <Ionicons name="close" size={16} color="#0F2840" />
+                          <Ionicons name="close" size={16} color={theme.text} />
                         </Pressable>
                       </View>
                       {expanded ? (
@@ -812,7 +856,7 @@ export function ImportPlanSheet({
                   </Text>
                 </Pressable>
                 <Pressable style={{ marginTop: 10 }} onPress={closeSheet}>
-                  <Text style={{ textAlign: 'center', fontFamily: 'DMSans_500Medium', fontSize: 13, color: 'rgba(15,40,64,0.55)' }}>
+                  <Text style={{ textAlign: 'center', fontFamily: 'DMSans_500Medium', fontSize: 13, color: withAlpha(theme.text, 0.55) }}>
                     Cancel import
                   </Text>
                 </Pressable>
@@ -821,7 +865,7 @@ export function ImportPlanSheet({
 
             {editingSessionId ? (
               <Pressable style={{ marginTop: 12, alignSelf: 'center' }} onPress={() => void onDeleteEditingSession()}>
-                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 13, color: '#8A1F1F' }}>Delete session</Text>
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.danger }}>Delete session</Text>
               </Pressable>
             ) : null}
           </ScrollView>

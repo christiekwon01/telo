@@ -14,7 +14,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -30,7 +29,6 @@ import {
   useToggleSessionStepChecked,
   useUncompleteSession,
 } from '@/hooks/useSessionData';
-import { deleteSessionById } from '@/services/importPlan';
 import { syncPersonalBestsAfterSessionLogsChange } from '@/services/personalBests';
 import { supabase } from '@/lib/supabase';
 import { withAlpha } from '@/lib/theme-utils';
@@ -105,7 +103,6 @@ export default function SessionDetailScreen() {
   const [distanceUnit, setDistanceUnit] = useState<'m' | 'km'>(savedDraft?.distanceUnit ?? 'km');
   const [avgHr, setAvgHr] = useState(savedDraft?.avgHr ?? '');
   const [rpe, setRpe] = useState<number | null>(savedDraft?.rpe ?? null);
-  const [isEditingSets, setIsEditingSets] = useState(false);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
   const [mediaUris, setMediaUris] = useState<string[]>([]);
   const completeSession = useSessionStore((state) => state.completeSession);
@@ -454,57 +451,6 @@ export default function SessionDetailScreen() {
     ]);
   };
 
-  const openSessionActions = () => {
-    if (!sessionId) return;
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', 'Edit session', 'Delete session'], cancelButtonIndex: 0, destructiveButtonIndex: 2 },
-        (index) => {
-          if (index === 1) setIsImportSheetOpen(true);
-          if (index === 2 && session) {
-            Alert.alert('Delete session?', 'This removes the session permanently.', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => {
-                  void deleteSessionById(session.athlete_id, sessionId)
-                    .then(async () => {
-                      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-                      router.back();
-                    })
-                    .catch((deleteError: unknown) => {
-                      Alert.alert('Could not delete', deleteError instanceof Error ? deleteError.message : 'Unknown error');
-                    });
-                },
-              },
-            ]);
-          }
-        }
-      );
-      return;
-    }
-    Alert.alert('Session actions', undefined, [
-      { text: 'Edit session', onPress: () => setIsImportSheetOpen(true) },
-      {
-        text: 'Delete session',
-        style: 'destructive',
-        onPress: () => {
-          if (!sessionId || !session) return;
-          void deleteSessionById(session.athlete_id, sessionId)
-            .then(async () => {
-              await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-              router.back();
-            })
-            .catch((deleteError: unknown) => {
-              Alert.alert('Could not delete', deleteError instanceof Error ? deleteError.message : 'Unknown error');
-            });
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
   if (!sessionId) {
     return (
       <SafeAreaView style={[styles.screen, themed.screen]}>
@@ -570,19 +516,7 @@ export default function SessionDetailScreen() {
           <Text style={[styles.sportLabel, themed.accent]}>{session.sport.toUpperCase()}</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            hitSlop={10}
-            style={[styles.editToggleButton, isEditingSets ? { backgroundColor: withAlpha(theme.accent, 0.15) } : null]}
-            onPress={() => {
-              const next = !isEditingSets;
-              setIsEditingSets(next);
-              if (Platform.OS === 'android') {
-                ToastAndroid.show(next ? 'Set editing enabled' : 'Set editing locked', ToastAndroid.SHORT);
-              }
-            }}>
-            <Ionicons name={isEditingSets ? 'checkmark' : 'pencil'} size={18} color={isEditingSets ? theme.accent : theme.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity hitSlop={10} style={styles.editToggleButton} onPress={openSessionActions}>
+          <TouchableOpacity hitSlop={10} style={styles.editToggleButton} onPress={() => setIsImportSheetOpen(true)}>
             <Ionicons name="ellipsis-horizontal" size={18} color={theme.primary} />
           </TouchableOpacity>
         </View>
@@ -592,6 +526,22 @@ export default function SessionDetailScreen() {
         <View style={[styles.heroCard, themed.primarySurface]}>
           <Text style={[styles.heroTitle, themed.onPrimary]}>{session.title}</Text>
           <Text style={[styles.heroMeta, { color: withAlpha(theme.onPrimary, 0.6) }]}>{sessionDetails.join(' · ')}</Text>
+          <Pressable
+            style={[styles.dateStampChip, { borderColor: withAlpha(theme.onPrimary, 0.35), backgroundColor: withAlpha(theme.onPrimary, 0.1) }]}
+            onPress={() => setIsImportSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Edit session date">
+            <Ionicons name="calendar-outline" size={13} color={theme.onPrimary} />
+            <Text style={[styles.dateStampText, { color: theme.onPrimary }]}>
+              {new Date(`${session.scheduled_date}T00:00:00`).toLocaleDateString('en-AU', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </Text>
+            <Ionicons name="pencil-outline" size={12} color={theme.onPrimary} />
+          </Pressable>
           <View style={[styles.heroAccentLine, themed.accentBg]} />
         </View>
 
@@ -612,9 +562,8 @@ export default function SessionDetailScreen() {
               return (
                 <View key={step.id} style={styles.stepRow}>
                   <Pressable
-                    disabled={!isEditingSets}
                     onPress={() => toggleStep(step.id)}
-                    style={[styles.stepPressable, !isEditingSets ? styles.stepPressableDisabled : null]}>
+                    style={styles.stepPressable}>
                     <View style={[styles.stepCircle, themed.subtleBorder, { borderColor: theme.accent }, checked ? [styles.stepCircleChecked, themed.accentBg] : null]}>
                       {checked ? <Ionicons name="checkmark" size={10} color={theme.onAccent} /> : null}
                     </View>
@@ -908,6 +857,21 @@ const styles = StyleSheet.create({
     fontFamily: 'System',
     fontSize: 12,
     color: 'rgba(255,255,255,0.5)',
+  },
+  dateStampChip: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    minHeight: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dateStampText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 12,
   },
   heroAccentLine: {
     height: 1,
