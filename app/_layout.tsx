@@ -1,3 +1,4 @@
+/* eslint-disable import/no-duplicates -- RNGH needs a side-effect import plus GestureHandlerRootView from the same package */
 import React, { Component, ReactNode, useEffect, useRef } from 'react';
 import 'react-native-gesture-handler';
 import { DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';

@@ -301,10 +301,16 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
+      await supabase.auth.signOut();
+    } catch {
+      /* still clear local state */
+    }
+    try {
       await AsyncStorage.clear();
     } catch {
       /* still continue reset */
     }
+    queryClient.clear();
     await resetOnboardingCompletion();
     router.replace('/(tabs)');
   };

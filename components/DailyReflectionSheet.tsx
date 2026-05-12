@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -96,10 +97,6 @@ export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso
 
   const onSave = useCallback(async () => {
     const trimmed = bodyText.trim();
-    if (!trimmed) {
-      Alert.alert('Add a note', 'Write something in your reflection before saving.');
-      return;
-    }
     try {
       await upsert.mutateAsync({
         entry_date: entryDateIso,
@@ -145,7 +142,15 @@ export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso
         </View>
         <Text style={styles.dateLabel}>{entryDateIso}</Text>
 
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 52 : 0}>
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}>
           {completedContext.length > 0 ? (
             <View style={styles.contextCard}>
               <Text style={styles.contextTitle}>Completed today</Text>
@@ -187,7 +192,7 @@ export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso
             style={styles.textArea}
             multiline
             textAlignVertical="top"
-            placeholder="How did today go?"
+            placeholder="How did today go? (optional)"
             placeholderTextColor={theme.textMuted}
             value={bodyText}
             onChangeText={setBodyText}
@@ -219,7 +224,8 @@ export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso
               </Pressable>
             );
           })}
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
 
       <Modal transparent visible={templatesOpen} animationType="fade" onRequestClose={() => setTemplatesOpen(false)}>
@@ -271,6 +277,7 @@ function StarRow({
 function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.base },
+    keyboardAvoid: { flex: 1 },
     header: {
       flexDirection: 'row',
       alignItems: 'center',

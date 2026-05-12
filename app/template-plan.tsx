@@ -22,7 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import type { AppTheme } from '@/contexts/ThemeContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { sessionQueryKeys, useActiveAthlete } from '@/hooks/useSessionData';
+import { useActiveAthlete } from '@/hooks/useSessionData';
 import { withAlpha } from '@/lib/theme-utils';
 import { supabase } from '@/lib/supabase';
 import { assignTemplatePlan } from '@/services/assignTemplatePlan';
