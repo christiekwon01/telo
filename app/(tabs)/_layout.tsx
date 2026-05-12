@@ -13,11 +13,12 @@ export default function TabLayout() {
           tabBarStyle: { display: 'none' },
           sceneStyle: { backgroundColor: 'transparent' },
         }}>
-        <Tabs.Screen name="index" />
-        <Tabs.Screen name="plan" />
+        <Tabs.Screen name="index" options={{ href: '/(tabs)' }} />
+        <Tabs.Screen name="plan" options={{ href: '/plan' }} />
         <Tabs.Screen name="intelligence" options={{ href: null }} />
-        <Tabs.Screen name="progress" />
-        <Tabs.Screen name="profile" />
+        <Tabs.Screen name="progress" options={{ href: '/progress' }} />
+        <Tabs.Screen name="journal" options={{ href: '/journal' }} />
+        <Tabs.Screen name="profile" options={{ href: '/profile' }} />
       </Tabs>
     </WebLayout>
   );

@@ -25,6 +25,7 @@ import { StatusAreaFade } from '@/components/status-area-fade';
 import { TabHeader } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sessionQueryKeys, useActiveAthlete } from '@/hooks/useSessionData';
+import { journalQueryKeys } from '@/hooks/useJournalAndHabits';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
 import { resetOnboardingCompletion } from '@/lib/onboarding-completion';
 import {
@@ -32,6 +33,7 @@ import {
   getAppleCalendarPrefs as loadApplePrefs,
 } from '@/services/appleCalendarSync';
 import { exportAllData } from '@/services/exportData';
+import { resetTrainingDataForAthlete } from '@/services/resetTrainingData';
 import {
   getHuaweiIntegrationState,
 } from '@/services/huaweiHealthSync';
@@ -73,6 +75,9 @@ export default function ProfileScreen() {
   const [showExportSheet, setShowExportSheet] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportProgress, setExportProgress] = useState<{ step: string; percent: number } | null>(null);
+  const [isResettingTrainingData, setIsResettingTrainingData] = useState(false);
+  /** Web: `window.confirm` is often blocked (iframe, embed, strict policies); use an in-app sheet instead. */
+  const [resetTrainingConfirmOpen, setResetTrainingConfirmOpen] = useState(false);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const athleteLevel = (athlete?.level as AthleteLevel | undefined) ?? 'fara';
   const swimBackground = (athlete?.swim_background as SportBackground | undefined) ?? 'beginner';
@@ -225,6 +230,75 @@ export default function ProfileScreen() {
     }
   };
 
+  const executeResetTrainingData = async () => {
+    if (!athlete?.id) return;
+    setIsResettingTrainingData(true);
+    try {
+      await resetTrainingDataForAthlete(athlete.id);
+
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        const weeklyKeys = keys.filter((k) => k.startsWith('weekly_intention:'));
+        if (weeklyKeys.length > 0) {
+          await AsyncStorage.multiRemove(weeklyKeys);
+        }
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        await AsyncStorage.removeItem('telo:rova:last-generated-at');
+      } catch {
+        /* ignore */
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: sessionQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['session_logs'] }),
+        queryClient.invalidateQueries({ queryKey: ['plan'] }),
+        queryClient.invalidateQueries({ queryKey: ['personal_bests'] }),
+        queryClient.invalidateQueries({ queryKey: sessionQueryKeys.personalBests(athlete.id) }),
+        queryClient.invalidateQueries({ queryKey: ['personal_bests', 'session_logs', athlete.id] }),
+        queryClient.invalidateQueries({ queryKey: ['session_logs', 'count', athlete.id] }),
+        queryClient.invalidateQueries({ queryKey: ['rova_challenges'] }),
+        queryClient.invalidateQueries({ queryKey: ['rova_coach_directive'] }),
+        queryClient.invalidateQueries({ queryKey: journalQueryKeys.all }),
+      ]);
+      showToast('Training data reset');
+    } catch (error) {
+      Alert.alert('Could not reset data', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsResettingTrainingData(false);
+    }
+  };
+
+  const trainingDataResetExplanation =
+    'This permanently deletes all your planned and completed sessions, completion logs, step-by-step blocks, personal bests, Rova challenges, flex-week history, and locally saved weekly intentions. Your active plan row and goal races are not removed. This cannot be undone.';
+
+  const handleResetTrainingData = () => {
+    if (isResettingTrainingData) return;
+    if (!athlete?.id) {
+      showToast('Sign in or finish onboarding before resetting training data.');
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      setResetTrainingConfirmOpen(true);
+      return;
+    }
+
+    Alert.alert('Reset all training data?', trainingDataResetExplanation, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete all',
+        style: 'destructive',
+        onPress: () => {
+          void executeResetTrainingData();
+        },
+      },
+    ]);
+  };
+
   const handleLogout = async () => {
     try {
       await AsyncStorage.clear();
@@ -240,7 +314,7 @@ export default function ProfileScreen() {
       <StatusAreaFade height={insets.top + 8} />
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={[styles.content, Platform.OS === 'web' ? styles.webContent : null]}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}>
         <TabHeader title="Profile" paddingHorizontal={0} />
@@ -376,16 +450,22 @@ export default function ProfileScreen() {
             <Text style={styles.rowLabel}>Personal data export</Text>
             <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
           </Pressable>
+          <Pressable
+            style={[styles.row, styles.resetRow]}
+            disabled={isResettingTrainingData}
+            onPress={handleResetTrainingData}
+            accessibilityRole="button">
+            <Text style={styles.resetLabel}>Reset training data</Text>
+            <Text style={styles.resetValue}>{isResettingTrainingData ? 'Deleting...' : 'Delete all sessions'}</Text>
+          </Pressable>
         </View>
 
-        {__DEV__ ? (
-          <View style={styles.card}>
-            <Text style={styles.devLabel}>Dev tools</Text>
-            <Pressable style={styles.devButton} onPress={() => setRovaDevOpen(true)}>
-              <Text style={styles.devButtonText}>Rova intelligence (challenges, chat, flex…)</Text>
-            </Pressable>
-          </View>
-        ) : null}
+        <View style={styles.card}>
+          <Text style={styles.devLabel}>Rova intelligence</Text>
+          <Pressable style={styles.devButton} onPress={() => setRovaDevOpen(true)}>
+            <Text style={styles.devButtonText}>Open challenges, chat, and flex tools</Text>
+          </Pressable>
+        </View>
 
         <Pressable style={styles.logoutButton} onPress={() => void handleLogout()}>
           <Text style={styles.logoutText}>Logout</Text>
@@ -482,13 +562,41 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-      {__DEV__ ? (
-        <RovaIntelligenceDevTools
-          visible={rovaDevOpen}
-          onClose={() => setRovaDevOpen(false)}
-          athleteId={athlete?.id}
-        />
+      {Platform.OS === 'web' ? (
+        <Modal
+          transparent
+          visible={resetTrainingConfirmOpen}
+          animationType="fade"
+          onRequestClose={() => setResetTrainingConfirmOpen(false)}>
+          <View style={styles.levelModalRoot}>
+            <Pressable style={styles.modalOverlay} onPress={() => setResetTrainingConfirmOpen(false)} />
+            <View style={[styles.modalCard, styles.levelModalCard, { paddingBottom: Math.max(insets.bottom, 20) + 8 }]}>
+              <View style={styles.modalHandle} />
+              <Pressable style={styles.modalCloseButton} onPress={() => setResetTrainingConfirmOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={16} color={theme.primary} />
+              </Pressable>
+              <Text style={styles.modalTitle}>Reset all training data?</Text>
+              <Text style={styles.modalBody}>{trainingDataResetExplanation}</Text>
+              <Pressable
+                style={styles.modalDangerAction}
+                onPress={() => {
+                  setResetTrainingConfirmOpen(false);
+                  void executeResetTrainingData();
+                }}>
+                <Text style={styles.modalDangerActionText}>Delete all sessions</Text>
+              </Pressable>
+              <Pressable style={[styles.modalAction, styles.resetModalCancel]} onPress={() => setResetTrainingConfirmOpen(false)}>
+                <Text style={styles.modalActionText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       ) : null}
+      <RovaIntelligenceDevTools
+        visible={rovaDevOpen}
+        onClose={() => setRovaDevOpen(false)}
+        athleteId={athlete?.id}
+      />
       <FloatingPillNav active="profile" />
     </SafeAreaView>
   );
@@ -504,11 +612,6 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 140,
-  },
-  webContent: {
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
   },
   subHeading: {
     marginTop: 2,
@@ -544,6 +647,24 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
+  },
+  resetRow: {
+    borderTopWidth: 1,
+    borderTopColor: `${theme.accent}33`,
+    marginTop: 6,
+    paddingTop: 10,
+  },
+  resetLabel: {
+    fontFamily: 'DMSans-Medium',
+    fontSize: 13,
+    color: theme.accent,
+  },
+  resetValue: {
+    fontFamily: 'DMSans-Regular',
+    fontSize: 12,
+    color: theme.accent,
+    opacity: 0.85,
+    textAlign: 'right',
   },
   linkText: {
     fontFamily: 'DMSans-Medium',
@@ -775,6 +896,25 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: theme.primary,
+  },
+  resetModalCancel: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  modalDangerAction: {
+    alignSelf: 'stretch',
+    marginTop: 8,
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.danger,
+  },
+  modalDangerActionText: {
+    fontFamily: 'DMSans-SemiBold',
+    fontSize: 14,
+    color: '#FFFFFF',
   },
   levelOptionRow: {
     minHeight: 42,

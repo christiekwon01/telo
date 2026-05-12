@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  Alert,
   Animated,
   Modal,
   Platform,
@@ -11,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   ToastAndroid,
   TouchableOpacity,
   View,
@@ -18,10 +21,12 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlexWeekSheet } from '@/components/FlexWeekSheet';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
+import { DailyReflectionSheet } from '@/components/DailyReflectionSheet';
 import { SkeletonBlock } from '@/components/loading-ui';
 import { getSportIcon } from '@/components/sport-icon';
 import { TabHeader } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
+import { journalQueryKeys } from '@/hooks/useJournalAndHabits';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
 import { useActiveAthlete, useLevelProgress, useRaceGoals, useUpcomingSessions, useTodaysSessions, useWeekSessions } from '@/hooks/useSessionData';
 import { useWeeklyChallenges } from '@/hooks/useWeeklyChallenges';
@@ -51,6 +56,12 @@ function addDays(value: Date, days: number) {
   next.setDate(next.getDate() + days);
   return next;
 }
+
+const WEEKLY_INTENTION_EXAMPLES = [
+  'Protect sleep this week and keep easy days truly easy.',
+  'Nail consistency: complete planned sessions before adding extras.',
+  'Travel week: prioritize short quality sessions and mobility.',
+];
 
 /** When Rova API is unavailable, keep the card conversational from local cues. */
 function buildCoachDirectiveFallback(
@@ -104,13 +115,18 @@ export default function HomeScreen() {
   const nextLevel = levelProgress.nextLevel;
   const atPeakTier = levelProgress.atPeakTier;
   const weekStart = useMemo(() => getWeekStartMonday(new Date()), []);
+  const weekStartIso = useMemo(() => toLocalIsoDate(weekStart), [weekStart]);
+  const intentionStorageKey = useMemo(() => `weekly_intention:${weekStartIso}`, [weekStartIso]);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => toLocalIsoDate(addDays(weekStart, i))), [weekStart]);
   const { data: weekSessionsByDate = {}, isLoading: weekLoading } = useWeekSessions(weekStart);
   const [isIntentionsOpen, setIsIntentionsOpen] = useState(false);
+  const [weeklyIntention, setWeeklyIntention] = useState('');
+  const [intentionDraft, setIntentionDraft] = useState('');
   const [isFlexWeekOpen, setIsFlexWeekOpen] = useState(false);
   const [flexInitialReason, setFlexInitialReason] = useState<'Catch up' | undefined>(undefined);
   const [showCatchupNudge, setShowCatchupNudge] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [reflectTodayOpen, setReflectTodayOpen] = useState(false);
   const intentionSheetY = useRef(new Animated.Value(420)).current;
   const { todaysChallenge, maybeGenerateForWeek } = useWeeklyChallenges(athlete?.id);
 
@@ -138,7 +154,6 @@ export default function HomeScreen() {
     if (daysOut === 0) return `${todayDate} · Race day`;
     return todayDate;
   }, [raceGoals, todayDate]);
-  const isMonday = useMemo(() => new Date().getDay() === 1, []);
   const todayIso = useMemo(() => toLocalIsoDate(new Date()), []);
   const weekStats = useMemo(() => {
     const sessionsAll = weekDates.flatMap((date) => weekSessionsByDate[date] ?? []);
@@ -247,6 +262,27 @@ export default function HomeScreen() {
         setIsIntentionsOpen(false);
       }
     });
+  };
+
+  const openIntentionsEditor = () => {
+    setIntentionDraft(weeklyIntention);
+    openIntentionsSheet();
+  };
+
+  const saveWeeklyIntention = async () => {
+    const trimmed = intentionDraft.trim();
+    try {
+      await AsyncStorage.setItem(intentionStorageKey, trimmed);
+      setWeeklyIntention(trimmed);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Weekly intention saved', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Saved', 'Weekly intention updated.');
+      }
+      closeIntentionsSheet();
+    } catch {
+      Alert.alert('Could not save', 'Please try again.');
+    }
   };
 
   const openFlexWeekSheet = (presetReason?: 'Catch up') => {
@@ -375,6 +411,27 @@ export default function HomeScreen() {
     void checkMissedStreak();
   }, [athlete?.id, todayIso]);
 
+  useEffect(() => {
+    let active = true;
+    const loadWeeklyIntention = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(intentionStorageKey);
+        if (!active) return;
+        const value = stored?.trim() ?? '';
+        setWeeklyIntention(value);
+        setIntentionDraft(value);
+      } catch {
+        if (!active) return;
+        setWeeklyIntention('');
+        setIntentionDraft('');
+      }
+    };
+    void loadWeeklyIntention();
+    return () => {
+      active = false;
+    };
+  }, [intentionStorageKey]);
+
   const onRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([
@@ -383,6 +440,7 @@ export default function HomeScreen() {
       todaysChallenge.refetch(),
       queryClient.invalidateQueries({ queryKey: ['rova_coach_directive'] }),
       queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+      queryClient.invalidateQueries({ queryKey: journalQueryKeys.all }),
     ]);
     setIsRefreshing(false);
   };
@@ -443,7 +501,7 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.screen, themeStyles.screen]}>
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' ? styles.webContent : null]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -501,6 +559,14 @@ export default function HomeScreen() {
           <Text style={[styles.coachNote, themeStyles.onPrimaryMutedText]}>{coachBodyText}</Text>
         </View>
 
+        <Pressable
+          style={[styles.reflectTodayBtn, { borderColor: withAlpha(theme.primary, 0.14), backgroundColor: theme.surface }]}
+          onPress={() => setReflectTodayOpen(true)}
+          disabled={!athlete?.id}>
+          <Ionicons name="book-outline" size={18} color={theme.accent} />
+          <Text style={[styles.reflectTodayLabel, { color: theme.primary }]}>Reflect on today</Text>
+        </Pressable>
+
         {showCatchupNudge ? (
           <Pressable style={[styles.flexNudge, themeStyles.flexNudge]} onPress={() => openFlexWeekSheet('Catch up')}>
             <Text style={[styles.flexNudgeText, themeStyles.flexNudgeText]}>Behind on your plan? Rova can help reshuffle.</Text>
@@ -553,12 +619,21 @@ export default function HomeScreen() {
             })}
           </View>
 
-          {isMonday ? (
-            <Pressable style={[styles.intentionsBanner, themeStyles.intentionsBanner]} onPress={openIntentionsSheet}>
-              <Ionicons name="pencil" size={14} color={themeStyles.intentionsIcon.color} />
-              <Text style={[styles.intentionsBannerText, themeStyles.intentionsText]}>New week. Set your intentions.</Text>
-            </Pressable>
-          ) : null}
+          <Pressable style={[styles.intentionsBanner, themeStyles.intentionsBanner]} onPress={openIntentionsEditor}>
+            <Ionicons name="pencil" size={14} color={themeStyles.intentionsIcon.color} />
+            <Text style={[styles.intentionsBannerText, themeStyles.intentionsText]}>
+              {weeklyIntention ? 'Edit weekly intention' : 'Set weekly intention'}
+            </Text>
+          </Pressable>
+          {weeklyIntention ? (
+            <Text style={[styles.intentionSummaryText, themeStyles.mutedText]} numberOfLines={3}>
+              {weeklyIntention}
+            </Text>
+          ) : (
+            <Text style={[styles.intentionSummaryPlaceholder, themeStyles.subtleText]}>
+              Add a weekly intention to keep your training focused.
+            </Text>
+          )}
 
           <View style={[styles.weeklyDivider, themeStyles.weeklyDivider]} />
           <View style={styles.statsRow}>
@@ -651,6 +726,18 @@ export default function HomeScreen() {
 
       <FloatingPillNav active="today" />
 
+      {athlete?.id && reflectTodayOpen ? (
+        <DailyReflectionSheet
+          visible
+          athleteId={athlete.id}
+          entryDateIso={todayIso}
+          onClose={() => setReflectTodayOpen(false)}
+          onSaved={() => {
+            void queryClient.invalidateQueries({ queryKey: journalQueryKeys.all });
+          }}
+        />
+      ) : null}
+
       <Modal transparent visible={isIntentionsOpen} animationType="none" onRequestClose={closeIntentionsSheet}>
         <View style={styles.modalRoot}>
           <Pressable style={[styles.modalOverlay, themeStyles.modalOverlay]} onPress={closeIntentionsSheet} />
@@ -661,18 +748,32 @@ export default function HomeScreen() {
             </Pressable>
             <Text style={[styles.sheetTitle, themeStyles.cardText]}>Weekly intentions</Text>
             <Text style={[styles.sheetDescription, themeStyles.mutedText]}>
-              Flag anything that may affect your week so your training can adapt smoothly.
+              Write your focus for the week. This saves for the current week and can be updated anytime.
             </Text>
-            {['Fatigue', 'Travel', 'Busy work/study days'].map((item) => (
-              <Pressable key={item} style={styles.flagRow}>
-                <View style={[styles.flagCircle, themeStyles.flagCircle]} />
-                <Text style={[styles.flagText, themeStyles.cardText]}>{item}</Text>
-              </Pressable>
-            ))}
+            <TextInput
+              value={intentionDraft}
+              onChangeText={setIntentionDraft}
+              multiline
+              placeholder={`Examples:\n- ${WEEKLY_INTENTION_EXAMPLES.join('\n- ')}`}
+              placeholderTextColor={withAlpha(theme.text, 0.4)}
+              style={[styles.intentionInput, { color: theme.text, borderColor: withAlpha(theme.primary, 0.14), backgroundColor: theme.surface }]}
+            />
+            <View style={styles.examplePills}>
+              {WEEKLY_INTENTION_EXAMPLES.map((item) => (
+                <Pressable
+                  key={item}
+                  style={[styles.examplePill, { borderColor: withAlpha(theme.primary, 0.12), backgroundColor: withAlpha(theme.primary, 0.04) }]}
+                  onPress={() => setIntentionDraft(item)}>
+                  <Text style={[styles.examplePillText, themeStyles.cardText]} numberOfLines={1}>
+                    {item}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <TouchableOpacity
               activeOpacity={0.9}
               style={[styles.sheetPrimaryButton, themeStyles.primaryButton]}
-              onPress={closeIntentionsSheet}>
+              onPress={() => void saveWeeklyIntention()}>
               <Text style={[styles.sheetPrimaryButtonText, themeStyles.primaryButtonText]}>Save intentions</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -708,11 +809,6 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 150,
     gap: 16,
-  },
-  webContent: {
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
   },
   headerButtons: {
     flexDirection: 'row',
@@ -783,85 +879,20 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 12,
   },
-  wildCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(15,40,64,0.12)',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    position: 'relative',
-  },
-  wildCardClose: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    zIndex: 2,
-  },
-  wildCardRow: {
+  reflectTodayBtn: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
-    paddingRight: 16,
+    marginTop: 4,
+    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  wildIconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#1E5A45',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  wildCardBody: {
-    flex: 1,
-  },
-  wildCardLabel: {
+  reflectTodayLabel: {
     fontFamily: 'DMSans-SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.9,
-    fontSize: 10,
-    color: '#C97E2F',
-    marginBottom: 4,
-  },
-  wildCardTitle: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 13,
-    color: '#0F2840',
-    marginBottom: 2,
-  },
-  wildCardDescription: {
-    fontFamily: 'DMSans-Regular',
-    fontSize: 12,
-    lineHeight: 17,
-    color: 'rgba(15,40,64,0.6)',
-  },
-  wildCardActions: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  wildPrimaryBtn: {
-    borderRadius: 999,
-    backgroundColor: '#0F2840',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  wildPrimaryBtnText: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 12,
-    color: '#FFFFFF',
-  },
-  wildSkipText: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 12,
-    color: 'rgba(15,40,64,0.45)',
-  },
-  wildCompleteText: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 12,
-    color: '#C97E2F',
+    fontSize: 14,
   },
   sessionsSection: {
     marginTop: 4,
@@ -957,6 +988,19 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans-Medium',
     fontSize: 12,
     color: '#0F2840',
+  },
+  intentionSummaryText: {
+    marginTop: 8,
+    fontFamily: 'DMSans-Regular',
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#0F2840',
+  },
+  intentionSummaryPlaceholder: {
+    marginTop: 8,
+    fontFamily: 'DMSans-Regular',
+    fontSize: 12,
+    color: 'rgba(15,40,64,0.45)',
   },
   weeklyDivider: {
     marginTop: 10,
@@ -1236,6 +1280,32 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: 'rgba(15,40,64,0.55)',
     marginBottom: 16,
+  },
+  intentionInput: {
+    minHeight: 120,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: 'DMSans-Regular',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlignVertical: 'top',
+    marginBottom: 10,
+  },
+  examplePills: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  examplePill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  examplePillText: {
+    fontFamily: 'DMSans-Regular',
+    fontSize: 12,
   },
   sheetPrimaryButton: {
     width: '100%',

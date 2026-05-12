@@ -2,15 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { TAB_HREF, type TabKey } from '@/lib/tabRoutes';
 
 /** Active tab icon + label (amber). Inactive: white @ 50% opacity. */
 const TAB_ACTIVE = '#C97E2F';
 const TAB_INACTIVE = 'rgba(255,255,255,0.5)';
 
-type NavRoute = '/(tabs)' | '/(tabs)/plan' | '/(tabs)/progress' | '/(tabs)/profile';
-
 type Props = {
-  active: 'today' | 'plan' | 'rova' | 'progress' | 'profile';
+  active: 'today' | 'plan' | 'rova' | 'progress' | 'journal' | 'profile';
 };
 
 export function FloatingPillNav({ active }: Props) {
@@ -22,11 +21,12 @@ export function FloatingPillNav({ active }: Props) {
 
   if (isWebDesktop) return null;
 
-  const tabs: { key: Props['active']; icon: keyof typeof Ionicons.glyphMap; label: string; route: NavRoute }[] = [
-    { key: 'today', icon: 'locate', label: 'Today', route: '/(tabs)' },
-    { key: 'plan', icon: 'calendar-clear-outline', label: 'Plan', route: '/(tabs)/plan' },
-    { key: 'progress', icon: 'bar-chart-outline', label: 'Progress', route: '/(tabs)/progress' },
-    { key: 'profile', icon: 'person-circle-outline', label: 'Profile', route: '/(tabs)/profile' },
+  const tabs: { key: Props['active']; icon: keyof typeof Ionicons.glyphMap; label: string; tab: TabKey }[] = [
+    { key: 'today', icon: 'locate', label: 'Today', tab: 'today' },
+    { key: 'plan', icon: 'calendar-clear-outline', label: 'Plan', tab: 'plan' },
+    { key: 'progress', icon: 'bar-chart-outline', label: 'Progress', tab: 'progress' },
+    { key: 'journal', icon: 'book-outline', label: 'Journal', tab: 'journal' },
+    { key: 'profile', icon: 'person-circle-outline', label: 'Profile', tab: 'profile' },
   ];
 
   return (
@@ -40,7 +40,7 @@ export function FloatingPillNav({ active }: Props) {
               style={styles.btn}
               onPress={() => {
                 if (tab.key !== active) {
-                  router.replace(tab.route);
+                  router.replace(TAB_HREF[tab.tab]);
                 }
               }}>
               <View style={styles.tabCluster}>
@@ -64,11 +64,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nav: {
-    width: '86%',
+    width: '94%',
     minHeight: 70,
     borderRadius: 24,
     paddingVertical: 4,
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
     backgroundColor: '#0F2840',
     flexDirection: 'row',
     alignItems: 'center',
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'DMSans_500Medium',
-    fontSize: 10,
+    fontSize: 9,
   },
 });
 

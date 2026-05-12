@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useActiveAthlete, useRaceGoals } from '@/hooks/useSessionData';
+import { withAlpha } from '@/lib/theme-utils';
+import { TAB_HREF, tabPathIsActive, type TabKey } from '@/lib/tabRoutes';
 import { daysUntilIsoDate, getPrimaryRaceForPlanning } from '@/services/racePriority';
 
 type RouteItem = {
-  label: 'Today' | 'Plan' | 'Progress' | 'Profile';
-  route: '/(tabs)' | '/(tabs)/plan' | '/(tabs)/progress' | '/(tabs)/profile';
+  label: 'Today' | 'Plan' | 'Progress' | 'Journal' | 'Profile';
+  tab: TabKey;
   icon: keyof typeof Ionicons.glyphMap;
-  active: boolean;
 };
 
 export function WebSidebar({ pathname }: { pathname: string }) {
@@ -23,68 +24,63 @@ export function WebSidebar({ pathname }: { pathname: string }) {
   const level = (athlete?.level ?? 'fara').toString();
 
   const items: RouteItem[] = [
-    {
-      label: 'Today',
-      route: '/(tabs)',
-      icon: 'locate-outline',
-      active: pathname === '/(tabs)' || pathname === '/',
-    },
-    {
-      label: 'Plan',
-      route: '/(tabs)/plan',
-      icon: 'calendar-outline',
-      active: pathname.startsWith('/(tabs)/plan'),
-    },
-    {
-      label: 'Progress',
-      route: '/(tabs)/progress',
-      icon: 'bar-chart-outline',
-      active: pathname.startsWith('/(tabs)/progress'),
-    },
-    {
-      label: 'Profile',
-      route: '/(tabs)/profile',
-      icon: 'person-outline',
-      active: pathname.startsWith('/(tabs)/profile') || pathname.includes('/goal-races') || pathname.includes('/template-plan'),
-    },
+    { label: 'Today', tab: 'today', icon: 'locate-outline' },
+    { label: 'Plan', tab: 'plan', icon: 'calendar-outline' },
+    { label: 'Progress', tab: 'progress', icon: 'bar-chart-outline' },
+    { label: 'Journal', tab: 'journal', icon: 'book-outline' },
+    { label: 'Profile', tab: 'profile', icon: 'person-outline' },
   ];
 
   return (
-    <View style={[styles.root, { backgroundColor: '#0F2840' }]}>
+    <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <View>
         <View style={styles.brandRow}>
-          <Text style={[styles.brandText, { color: '#F6F3EE' }]}>telo</Text>
-          <View style={[styles.brandDot, { backgroundColor: '#C97E2F' }]} />
+          <Text style={[styles.brandText, { color: theme.onPrimary }]}>telo</Text>
+          <View style={[styles.brandDot, { backgroundColor: theme.accent }]} />
         </View>
-        <Text style={[styles.athleteName, { color: 'rgba(246,243,238,0.6)' }]} numberOfLines={1}>
+        <Text style={[styles.athleteName, { color: withAlpha(theme.onPrimary, 0.62) }]} numberOfLines={1}>
           {athlete?.name ?? 'Athlete'}
         </Text>
-        <View style={styles.levelBadge}>
-          <Text style={styles.levelBadgeText}>{level[0].toUpperCase() + level.slice(1)}</Text>
+        <View style={[styles.levelBadge, { borderColor: theme.accent }]}>
+          <Text style={[styles.levelBadgeText, { color: theme.accent }]}>{level[0].toUpperCase() + level.slice(1)}</Text>
         </View>
       </View>
 
-      <View style={styles.navList}>
-        {items.map((item) => (
-          <Pressable
-            key={item.label}
-            style={[styles.navItem, item.active ? styles.navItemActive : null]}
-            onPress={() => router.replace(item.route)}>
-            <Ionicons
-              name={item.icon}
-              size={17}
-              color={item.active ? '#F6F3EE' : 'rgba(246,243,238,0.7)'}
-            />
-            <Text style={[styles.navLabel, item.active ? styles.navLabelActive : null]}>{item.label}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <ScrollView
+        style={styles.navScroll}
+        contentContainerStyle={styles.navList}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+        {items.map((item) => {
+          const active = tabPathIsActive(pathname, item.tab);
+          return (
+            <Pressable
+              key={item.label}
+              style={[styles.navItem, active ? [styles.navItemActive, { borderLeftColor: theme.accent }] : null]}
+              onPress={() => router.replace(TAB_HREF[item.tab])}>
+              <Ionicons
+                name={item.icon}
+                size={17}
+                color={active ? theme.onPrimary : withAlpha(theme.onPrimary, 0.7)}
+              />
+              <Text
+                style={[
+                  styles.navLabel,
+                  { color: withAlpha(theme.onPrimary, 0.7) },
+                  active ? [styles.navLabelActive, { color: theme.onPrimary }] : null,
+                ]}>
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       <View style={styles.bottomMeta}>
-        <Text style={styles.countdownText}>
+        <Text style={[styles.countdownText, { color: theme.accent }]}>
           {primaryRace ? `D-${Math.max(0, daysUntilIsoDate(primaryRace.event_date, todayIso))}` : 'Set race'}
         </Text>
-        <Text style={styles.raceNameText} numberOfLines={2}>
+        <Text style={[styles.raceNameText, { color: withAlpha(theme.onPrimary, 0.45) }]} numberOfLines={2}>
           {primaryRace?.title ?? 'No race goal yet'}
         </Text>
       </View>
@@ -95,6 +91,7 @@ export function WebSidebar({ pathname }: { pathname: string }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    flexDirection: 'column',
     paddingHorizontal: 18,
     paddingTop: 28,
     paddingBottom: 16,
@@ -134,9 +131,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#C97E2F',
   },
-  navList: {
+  navScroll: {
+    flexGrow: 1,
+    flexShrink: 1,
+    minHeight: 0,
     marginTop: 26,
+  },
+  navList: {
+    flexGrow: 1,
     gap: 6,
+    paddingBottom: 12,
   },
   navItem: {
     flexDirection: 'row',
@@ -159,7 +163,8 @@ const styles = StyleSheet.create({
     color: '#F6F3EE',
   },
   bottomMeta: {
-    marginTop: 'auto',
+    flexShrink: 0,
+    marginTop: 12,
   },
   countdownText: {
     fontFamily: 'DMSans_500Medium',

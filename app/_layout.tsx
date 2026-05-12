@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import React, { Component, ReactNode, useEffect, useRef } from 'react';
+import 'react-native-gesture-handler';
 import { DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import {
   CormorantGaramond_600SemiBold,
@@ -15,6 +16,8 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Text, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { PersonalBestCelebration } from '@/components/PersonalBestCelebration';
@@ -22,6 +25,31 @@ import { supabase } from '@/lib/supabase';
 import { triggerHuaweiAutoSyncIfNeeded, wireHuaweiAutoSyncOnAppOpen } from '@/services/huaweiHealthSync';
 
 const queryClient = new QueryClient();
+
+type RootErrorBoundaryState = {
+  error: Error | null;
+};
+
+class RootErrorBoundary extends Component<{ children: ReactNode }, RootErrorBoundaryState> {
+  state: RootErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): RootErrorBoundaryState {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#F6F3EE' }}>
+          <Text style={{ color: '#0F2840', fontSize: 14, textAlign: 'center' }}>
+            Error: {this.state.error.message}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -39,11 +67,13 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <RootNavigator />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <RootErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <RootNavigator />
+        </ThemeProvider>
+      </QueryClientProvider>
+    </RootErrorBoundary>
   );
 }
 
@@ -86,22 +116,23 @@ function RootNavigator() {
   };
 
   return (
-    <NavigationThemeProvider value={navigationTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="SessionDetail" options={{ headerShown: false }} />
-        <Stack.Screen name="goal-races" options={{ headerShown: false }} />
-        <Stack.Screen name="template-plan" options={{ headerShown: false }} />
-        <Stack.Screen name="apple-calendar" options={{ headerShown: false }} />
-        <Stack.Screen name="huawei-health" options={{ headerShown: false }} />
-        <Stack.Screen name="progress-history" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <PersonalBestCelebration />
-      <StatusBar style="auto" />
-    </NavigationThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationThemeProvider value={navigationTheme}>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="SessionDetail" options={{ headerShown: false }} />
+          <Stack.Screen name="goal-races" options={{ headerShown: false }} />
+          <Stack.Screen name="template-plan" options={{ headerShown: false }} />
+          <Stack.Screen name="apple-calendar" options={{ headerShown: false }} />
+          <Stack.Screen name="huawei-health" options={{ headerShown: false }} />
+          <Stack.Screen name="progress-history" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <PersonalBestCelebration />
+        <StatusBar style="auto" />
+      </NavigationThemeProvider>
+    </GestureHandlerRootView>
   );
 }

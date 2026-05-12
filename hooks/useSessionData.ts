@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   useMutation,
   useQuery,
@@ -7,6 +7,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { readAthleteId } from '@/lib/athlete-session';
+import { localCalendarRangeToUtcIsoBounds, toLocalIsoDate } from '@/lib/dates';
 import { ensureAthleteRowExists } from '@/lib/supabase-auth';
 import { supabase } from '@/lib/supabase';
 import {
@@ -63,10 +64,15 @@ export type CompleteSessionPayload = {
 const SPORT_ORDER: SportType[] = ['swim', 'bike', 'run', 'gym', 'brick', 'rest'];
 
 function toIsoDate(value: Date) {
-  const year = value.getFullYear();
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toLocalIsoDate(value);
+}
+
+async function resolveAthleteIdForQueries(): Promise<string | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (session?.user?.id) return session.user.id;
+  return readAthleteId();
 }
 
 function startOfDay(value: Date) {
@@ -93,7 +99,7 @@ function normalizeSport(value: string): SportType {
   return SPORT_ORDER.includes(value as SportType) ? (value as SportType) : 'rest';
 }
 
-function normalizeCompletionStatus(
+export function normalizeCompletionStatus(
   status: string | null,
   logs?: Pick<SessionLogRow, 'id' | 'completed_at'> | Pick<SessionLogRow, 'id' | 'completed_at'>[] | null
 ): SessionStatus {
@@ -120,8 +126,8 @@ export const sessionQueryKeys = {
   detail: (sessionId: string) => [...sessionQueryKeys.all, 'detail', sessionId] as const,
   activeAthlete: () => ['athlete', 'active'] as const,
   activePlan: (athleteId: string | null) => ['plan', 'active', athleteId ?? 'none'] as const,
-  completedLogs: (fromIso: string, toIso: string, trainingType: string) =>
-    ['session_logs', 'range', fromIso, toIso, trainingType] as const,
+  completedLogs: (athleteKey: string, fromIso: string, toIso: string, trainingType: string) =>
+    ['session_logs', 'range', athleteKey, fromIso, toIso, trainingType] as const,
   raceGoals: (athleteId: string | null) => ['race_goals', athleteId ?? 'none'] as const,
   personalBests: (athleteId: string | null) => ['personal_bests', athleteId ?? 'none'] as const,
 };
@@ -147,10 +153,13 @@ export async function invalidateSessionRelatedQueries(
     queryClient.invalidateQueries({ queryKey: sessionQueryKeys.month(monthYear, monthIndex) }),
     queryClient.invalidateQueries({ queryKey: sessionQueryKeys.detail(opts.sessionId) }),
     queryClient.invalidateQueries({ queryKey: ['session_logs'] }),
+    queryClient.invalidateQueries({ queryKey: ['rova_challenges'] }),
   ]);
 
   if (opts.athleteId) {
     await queryClient.invalidateQueries({ queryKey: ['session_logs', 'count', opts.athleteId] });
+    await queryClient.invalidateQueries({ queryKey: sessionQueryKeys.personalBests(opts.athleteId) });
+    await queryClient.invalidateQueries({ queryKey: ['personal_bests', 'session_logs', opts.athleteId] });
   }
 }
 
@@ -212,7 +221,7 @@ export function useActivePlan(athleteId: string | null | undefined) {
         .select('*')
         .eq('athlete_id', athleteId)
         .eq('status', 'active')
-        .order('start_date', { ascending: true })
+        .order('start_date', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw new Error(error.message);
@@ -269,24 +278,32 @@ export function usePersonalBestSessionLogs(athleteId: string | null | undefined)
 }
 
 export function useCompletedSessionLogs({
+  athleteId,
   fromIso,
   toIso,
   trainingType,
 }: {
+  athleteId: string | null | undefined;
   fromIso: string;
   toIso: string;
   trainingType: 'overall' | 'swim' | 'bike' | 'run';
 }) {
+  const athleteKey = athleteId ?? 'none';
+  const { gte, lte } = localCalendarRangeToUtcIsoBounds(fromIso, toIso);
+
   return useQuery({
-    queryKey: sessionQueryKeys.completedLogs(fromIso, toIso, trainingType),
+    queryKey: sessionQueryKeys.completedLogs(athleteKey, fromIso, toIso, trainingType),
+    enabled: Boolean(athleteId),
     queryFn: async () => {
+      if (!athleteId) return [];
       const query = supabase
         .from('session_logs')
         .select(
           'id,session_id,athlete_id,completed_at,actual_duration_mins,actual_distance,avg_heart_rate,rpe,notes,media_uris,sessions!inner(id,title,sport,duration_mins,distance,distance_unit,scheduled_date)'
         )
-        .gte('completed_at', `${fromIso}T00:00:00.000Z`)
-        .lte('completed_at', `${toIso}T23:59:59.999Z`)
+        .eq('athlete_id', athleteId)
+        .gte('completed_at', gte)
+        .lte('completed_at', lte)
         .order('completed_at', { ascending: false });
 
       const filtered = trainingType === 'overall' ? query : query.eq('sessions.sport', trainingType);
@@ -422,13 +439,12 @@ export function useLevelProgress(
   };
 }
 
-async function fetchTodaysSessions(todayIso: string): Promise<SessionWithCompletion[]> {
+async function fetchTodaysSessions(todayIso: string, athleteId: string): Promise<SessionWithCompletion[]> {
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      '*, session_blocks(*, session_steps(*)), session_logs(id, completed_at)'
-    )
-    .eq('scheduled_date', todayIso);
+    .select('*, session_logs(id, completed_at)')
+    .eq('scheduled_date', todayIso)
+    .eq('athlete_id', athleteId);
 
   if (error) throw new Error(error.message);
 
@@ -444,13 +460,11 @@ async function fetchTodaysSessions(todayIso: string): Promise<SessionWithComplet
 export function useTodaysSessions() {
   const queryClient = useQueryClient();
   const todayIso = toIsoDate(new Date());
-  const channelIdRef = useRef(
-    `today-sessions-${todayIso}-${Math.random().toString(36).slice(2, 8)}`
-  );
+  const realtimeChannelName = useMemo(() => `today-sessions-${todayIso}`, [todayIso]);
 
   useEffect(() => {
     const channel = supabase
-      .channel(channelIdRef.current)
+      .channel(realtimeChannelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
         void queryClient.invalidateQueries({ queryKey: sessionQueryKeys.today(todayIso) });
       })
@@ -462,11 +476,15 @@ export function useTodaysSessions() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [queryClient, todayIso]);
+  }, [queryClient, todayIso, realtimeChannelName]);
 
   return useQuery({
     queryKey: sessionQueryKeys.today(todayIso),
-    queryFn: () => fetchTodaysSessions(todayIso),
+    queryFn: async () => {
+      const athleteId = await resolveAthleteIdForQueries();
+      if (!athleteId) return [];
+      return fetchTodaysSessions(todayIso, athleteId);
+    },
   });
 }
 
@@ -478,9 +496,12 @@ export function useUpcomingSessions(limit = 30) {
   return useQuery({
     queryKey: sessionQueryKeys.upcoming(fromIso, safeLimit),
     queryFn: async () => {
+      const athleteId = await resolveAthleteIdForQueries();
+      if (!athleteId) return [];
       const { data, error } = await supabase
         .from('sessions')
         .select('*, session_logs(id, completed_at)')
+        .eq('athlete_id', athleteId)
         .gte('scheduled_date', fromIso)
         .order('scheduled_date', { ascending: true })
         .limit(safeLimit);
@@ -511,19 +532,22 @@ export function useWeekSessions(weekStart: Date) {
   return useQuery({
     queryKey: sessionQueryKeys.week(fromIso),
     queryFn: async () => {
+      const athleteId = await resolveAthleteIdForQueries();
+      const grouped: Record<string, SessionWithCompletion[]> = {};
+      for (let i = 0; i < 7; i += 1) {
+        grouped[toIsoDate(addDays(weekStartDate, i))] = [];
+      }
+      if (!athleteId) return grouped;
+
       const { data, error } = await supabase
         .from('sessions')
         .select('*, session_logs(id, completed_at)')
+        .eq('athlete_id', athleteId)
         .gte('scheduled_date', fromIso)
         .lte('scheduled_date', toIso)
         .order('scheduled_date', { ascending: true });
 
       if (error) throw new Error(error.message);
-
-      const grouped: Record<string, SessionWithCompletion[]> = {};
-      for (let i = 0; i < 7; i += 1) {
-        grouped[toIsoDate(addDays(weekStartDate, i))] = [];
-      }
 
       for (const row of sortBySportThenDate((data ?? []) as unknown as SessionWithCompletion[])) {
         const scheduled = row.scheduled_date;
@@ -549,9 +573,12 @@ export function useMonthSessions(year: number, month: number) {
   return useQuery({
     queryKey: sessionQueryKeys.month(year, month),
     queryFn: async () => {
+      const athleteId = await resolveAthleteIdForQueries();
+      if (!athleteId) return [];
       const { data, error } = await supabase
         .from('sessions')
         .select('*, session_logs(id, completed_at)')
+        .eq('athlete_id', athleteId)
         .gte('scheduled_date', fromIso)
         .lte('scheduled_date', toIso)
         .order('scheduled_date', { ascending: true });

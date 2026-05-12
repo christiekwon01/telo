@@ -469,6 +469,93 @@ export type Database = {
         };
         Relationships: [];
       };
+      daily_reflections: {
+        Row: {
+          id: string;
+          athlete_id: string;
+          entry_date: string;
+          body_text: string;
+          mood: number | null;
+          energy: number | null;
+          sleep_quality: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          athlete_id: string;
+          entry_date: string;
+          body_text?: string;
+          mood?: number | null;
+          energy?: number | null;
+          sleep_quality?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          athlete_id?: string;
+          entry_date?: string;
+          body_text?: string;
+          mood?: number | null;
+          energy?: number | null;
+          sleep_quality?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      journal_habits: {
+        Row: {
+          id: string;
+          athlete_id: string;
+          name: string;
+          icon_emoji: string;
+          sort_order: number;
+          archived_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          athlete_id: string;
+          name: string;
+          icon_emoji?: string;
+          sort_order?: number;
+          archived_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          athlete_id?: string;
+          name?: string;
+          icon_emoji?: string;
+          sort_order?: number;
+          archived_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      journal_habit_completions: {
+        Row: {
+          id: string;
+          habit_id: string;
+          completion_date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          habit_id: string;
+          completion_date: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          habit_id?: string;
+          completion_date?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {};
