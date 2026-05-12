@@ -235,13 +235,45 @@ export default function JournalScreen() {
                           else if (jr) dotColor = DOT.journal;
                           else if (sc) dotColor = DOT.session;
                           const isTodayCell = iso === todayIso;
+                          const isSelectedCell = dayDetailIso === iso;
+                          const isHighlightedCell = isTodayCell || isSelectedCell;
                           return (
                             <Pressable
                               key={iso}
-                              style={[styles.cell, isTodayCell ? styles.cellToday : null]}
+                              style={[
+                                styles.cell,
+                                isTodayCell ? styles.cellToday : null,
+                                isSelectedCell && !isTodayCell ? styles.cellSelected : null,
+                              ]}
                               onPress={() => setDayDetailIso(iso)}>
-                              <Text style={[styles.cellNum, isTodayCell ? styles.cellNumToday : null]}>{Number(iso.slice(8, 10))}</Text>
-                              {dotColor ? <View style={[styles.dot, { backgroundColor: dotColor }]} /> : <View style={styles.dotPlaceholder} />}
+                              <Text
+                                style={[
+                                  styles.cellNum,
+                                  isTodayCell ? styles.cellNumToday : null,
+                                  isSelectedCell && !isTodayCell ? styles.cellNumSelected : null,
+                                ]}>
+                                {Number(iso.slice(8, 10))}
+                              </Text>
+                              <View style={styles.dotRow}>
+                                {dotColor ? (
+                                  isHighlightedCell ? (
+                                    <View
+                                      style={[
+                                        styles.dotHalo,
+                                        {
+                                          borderColor: withAlpha(theme.accent, 0.5),
+                                          backgroundColor: withAlpha(theme.accent, 0.22),
+                                        },
+                                      ]}>
+                                      <View style={[styles.dotInner, { backgroundColor: dotColor }]} />
+                                    </View>
+                                  ) : (
+                                    <View style={[styles.dot, { backgroundColor: dotColor }]} />
+                                  )
+                                ) : (
+                                  <View style={styles.dotPlaceholder} />
+                                )}
+                              </View>
                             </Pressable>
                           );
                         })}
@@ -523,10 +555,27 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
       paddingTop: 0,
     },
     cellToday: { backgroundColor: withAlpha(theme.accent, 0.12), borderRadius: 8 },
+    cellSelected: { backgroundColor: withAlpha(theme.primary, 0.1), borderRadius: 8 },
     cellNum: { fontFamily: 'DMSans_500Medium', fontSize: 11, color: theme.text },
     cellNumToday: { color: theme.primary },
-    dot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
-    dotPlaceholder: { width: 4, height: 4, marginTop: 1 },
+    cellNumSelected: { color: theme.primary, fontFamily: 'DMSans_600SemiBold' },
+    dotRow: {
+      minHeight: 9,
+      marginTop: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dot: { width: 4, height: 4, borderRadius: 2 },
+    dotInner: { width: 4, height: 4, borderRadius: 2 },
+    dotHalo: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      borderWidth: StyleSheet.hairlineWidth,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dotPlaceholder: { width: 4, height: 4 },
     reflectCta: {
       flexDirection: 'row',
       alignItems: 'center',
