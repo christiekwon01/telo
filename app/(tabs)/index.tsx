@@ -619,21 +619,25 @@ export default function HomeScreen() {
             })}
           </View>
 
-          <Pressable style={[styles.intentionsBanner, themeStyles.intentionsBanner]} onPress={openIntentionsEditor}>
-            <Ionicons name="pencil" size={14} color={themeStyles.intentionsIcon.color} />
-            <Text style={[styles.intentionsBannerText, themeStyles.intentionsText]}>
-              {weeklyIntention ? 'Edit weekly intention' : 'Set weekly intention'}
-            </Text>
-          </Pressable>
-          {weeklyIntention ? (
-            <Text style={[styles.intentionSummaryText, themeStyles.mutedText]} numberOfLines={3}>
-              {weeklyIntention}
-            </Text>
-          ) : (
-            <Text style={[styles.intentionSummaryPlaceholder, themeStyles.subtleText]}>
-              Add a weekly intention to keep your training focused.
-            </Text>
-          )}
+          <View style={styles.intentionSummaryRow}>
+            {weeklyIntention ? (
+              <Text style={[styles.intentionSummaryText, themeStyles.mutedText]} numberOfLines={3}>
+                {weeklyIntention}
+              </Text>
+            ) : (
+              <Text style={[styles.intentionSummaryPlaceholder, themeStyles.subtleText]}>
+                Add a weekly intention to keep your training focused.
+              </Text>
+            )}
+            <Pressable
+              style={[styles.intentionEditIconButton, themeStyles.intentionsBanner]}
+              onPress={openIntentionsEditor}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={weeklyIntention ? 'Edit weekly intention' : 'Set weekly intention'}>
+              <Ionicons name="pencil" size={12} color={themeStyles.intentionsIcon.color} />
+            </Pressable>
+          </View>
 
           <View style={[styles.weeklyDivider, themeStyles.weeklyDivider]} />
           <View style={styles.statsRow}>
@@ -974,30 +978,31 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#0F2840',
   },
-  intentionsBanner: {
+  intentionSummaryRow: {
     marginTop: 10,
-    borderRadius: 10,
-    backgroundColor: 'rgba(201,126,47,0.12)',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    alignItems: 'flex-start',
+    gap: 8,
   },
-  intentionsBannerText: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 12,
-    color: '#0F2840',
+  intentionEditIconButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(201,126,47,0.12)',
+    marginTop: 1,
+    flexShrink: 0,
   },
   intentionSummaryText: {
-    marginTop: 8,
+    flex: 1,
     fontFamily: 'DMSans-Regular',
     fontSize: 12,
     lineHeight: 17,
     color: '#0F2840',
   },
   intentionSummaryPlaceholder: {
-    marginTop: 8,
+    flex: 1,
     fontFamily: 'DMSans-Regular',
     fontSize: 12,
     color: 'rgba(15,40,64,0.45)',

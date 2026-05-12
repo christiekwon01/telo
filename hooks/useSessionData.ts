@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import { readAthleteId } from '@/lib/athlete-session';
 import { localCalendarRangeToUtcIsoBounds, toLocalIsoDate } from '@/lib/dates';
+import { SINGLE_ACCOUNT_ATHLETE_ID } from '@/lib/single-account';
 import { ensureAthleteRowExists } from '@/lib/supabase-auth';
 import { supabase } from '@/lib/supabase';
 import {
@@ -72,7 +73,8 @@ async function resolveAthleteIdForQueries(): Promise<string | null> {
     data: { session },
   } = await supabase.auth.getSession();
   if (session?.user?.id) return session.user.id;
-  return readAthleteId();
+  const stored = await readAthleteId();
+  return stored ?? SINGLE_ACCOUNT_ATHLETE_ID;
 }
 
 function startOfDay(value: Date) {
@@ -197,6 +199,14 @@ export function useActiveAthlete() {
         if (error) throw new Error(error.message);
         if (data) return data as AthleteRow;
       }
+
+      const { data: single, error: singleError } = await supabase
+        .from('athletes')
+        .select('*')
+        .eq('id', SINGLE_ACCOUNT_ATHLETE_ID)
+        .maybeSingle();
+      if (singleError) throw new Error(singleError.message);
+      if (single) return single as AthleteRow;
 
       const { data: legacy, error: legacyError } = await supabase
         .from('athletes')

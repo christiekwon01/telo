@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -198,9 +199,6 @@ export default function JournalScreen() {
             {(() => {
               const monthCalendar = (
                 <View>
-                  <Text style={styles.swipeHint}>
-                    {Platform.OS === 'web' ? 'Use arrows to change month' : 'Swipe left or right to change month'}
-                  </Text>
                   <View style={styles.monthNav}>
                     <Pressable onPress={() => shiftMonth(-1)} hitSlop={12} style={styles.monthArrow}>
                       <Ionicons name="chevron-back" size={22} color={theme.primary} />
@@ -368,6 +366,7 @@ function JournalDayDetailModal({
   onClose: () => void;
   onEditReflection: (dateIso: string) => void;
 }) {
+  const router = useRouter();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -406,9 +405,14 @@ function JournalDayDetailModal({
             <View style={styles.block}>
               <Text style={styles.blockTitle}>Planned</Text>
               {planned.map((s) => (
-                <Text key={s.id} style={styles.line}>
-                  • {s.title} ({s.sport})
-                </Text>
+                <Pressable
+                  key={s.id}
+                  onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}
+                  style={styles.sessionRowPressable}>
+                  <Text style={[styles.line, styles.sessionLine]}>
+                    • {s.title} ({s.sport})
+                  </Text>
+                </Pressable>
               ))}
             </View>
           ) : null}
@@ -417,10 +421,15 @@ function JournalDayDetailModal({
             <View style={styles.block}>
               <Text style={styles.blockTitle}>Completed</Text>
               {completed.map((s) => (
-                <Text key={s.id} style={styles.line}>
-                  • {s.title} ({s.sport})
-                  {s.duration_mins != null ? ` · ${s.duration_mins} min` : ''}
-                </Text>
+                <Pressable
+                  key={s.id}
+                  onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}
+                  style={styles.sessionRowPressable}>
+                  <Text style={[styles.line, styles.sessionLine]}>
+                    • {s.title} ({s.sport})
+                    {s.duration_mins != null ? ` · ${s.duration_mins} min` : ''}
+                  </Text>
+                </Pressable>
               ))}
             </View>
           ) : null}
@@ -496,31 +505,24 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
       justifyContent: 'space-between',
       marginBottom: 10,
     },
-    swipeHint: {
-      fontFamily: 'DMSans_400Regular',
-      fontSize: 11,
-      color: theme.textMuted,
-      textAlign: 'center',
-      marginBottom: 6,
-    },
     monthArrow: { padding: 4 },
     monthTitle: { fontFamily: 'CormorantGaramond_700Bold', fontSize: 22, color: theme.text },
-    weekdayRow: { flexDirection: 'row', marginBottom: 4 },
+    weekdayRow: { flexDirection: 'row', marginBottom: 2 },
     weekday: { flex: 1, textAlign: 'center', fontFamily: 'DMSans_500Medium', fontSize: 11, color: theme.textMuted },
-    grid: { marginTop: 4 },
+    grid: { marginTop: 2 },
     gridRow: { flexDirection: 'row' },
     cell: {
       flex: 1,
-      aspectRatio: 0.85,
+      aspectRatio: 0.72,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingTop: 4,
+      paddingTop: 2,
     },
     cellToday: { backgroundColor: withAlpha(theme.accent, 0.12), borderRadius: 10 },
-    cellNum: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.text },
+    cellNum: { fontFamily: 'DMSans_500Medium', fontSize: 12, color: theme.text },
     cellNumToday: { color: theme.primary },
-    dot: { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
-    dotPlaceholder: { width: 6, height: 6, marginTop: 4 },
+    dot: { width: 5, height: 5, borderRadius: 2.5, marginTop: 2 },
+    dotPlaceholder: { width: 5, height: 5, marginTop: 2 },
     reflectCta: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -592,6 +594,8 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
     block: { marginBottom: 18 },
     blockTitle: { fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: theme.accent, marginBottom: 6 },
     line: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: theme.text, marginBottom: 4 },
+    sessionRowPressable: { paddingVertical: 2 },
+    sessionLine: { color: theme.primary },
     metaLine: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.textMuted, marginBottom: 8 },
     bodyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: theme.text, lineHeight: 22 },
     secondaryBtn: {

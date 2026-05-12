@@ -27,7 +27,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { sessionQueryKeys, useActiveAthlete } from '@/hooks/useSessionData';
 import { journalQueryKeys } from '@/hooks/useJournalAndHabits';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
-import { resetOnboardingCompletion } from '@/lib/onboarding-completion';
+import { SINGLE_ACCOUNT_EMAIL } from '@/lib/single-account';
 import {
   getAppleCalendarSubscriptionState,
   getAppleCalendarPrefs as loadApplePrefs,
@@ -300,19 +300,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      /* still clear local state */
-    }
-    try {
-      await AsyncStorage.clear();
-    } catch {
-      /* still continue reset */
-    }
-    queryClient.clear();
-    await resetOnboardingCompletion();
-    router.replace('/(tabs)');
+    Alert.alert('Single account mode', `Logout is temporarily disabled.\n\nThis app is currently locked to ${SINGLE_ACCOUNT_EMAIL}.`);
   };
 
   return (

@@ -41,8 +41,23 @@ export function WebSidebar({ pathname }: { pathname: string }) {
         <Text style={[styles.athleteName, { color: withAlpha(theme.onPrimary, 0.62) }]} numberOfLines={1}>
           {athlete?.name ?? 'Athlete'}
         </Text>
-        <View style={[styles.levelBadge, { borderColor: theme.accent }]}>
-          <Text style={[styles.levelBadgeText, { color: theme.accent }]}>{level[0].toUpperCase() + level.slice(1)}</Text>
+        <View style={styles.levelMetaRow}>
+          <View style={[styles.levelBadge, { borderColor: theme.accent }]}>
+            <Text style={[styles.levelBadgeText, { color: theme.accent }]}>{level[0].toUpperCase() + level.slice(1)}</Text>
+          </View>
+          <View style={styles.raceMetaInline}>
+            <Text style={[styles.countdownText, { color: theme.accent }]}>
+              {primaryRace ? `D-${Math.max(0, daysUntilIsoDate(primaryRace.event_date, todayIso))}` : 'Set race'}
+            </Text>
+            {primaryRace?.title ? (
+              <>
+                <View style={[styles.centerDot, { backgroundColor: withAlpha(theme.onPrimary, 0.45) }]} />
+                <Text style={[styles.raceNameInline, { color: withAlpha(theme.onPrimary, 0.45) }]} numberOfLines={1}>
+                  {primaryRace.title}
+                </Text>
+              </>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -75,15 +90,6 @@ export function WebSidebar({ pathname }: { pathname: string }) {
           );
         })}
       </ScrollView>
-
-      <View style={styles.bottomMeta}>
-        <Text style={[styles.countdownText, { color: theme.accent }]}>
-          {primaryRace ? `D-${Math.max(0, daysUntilIsoDate(primaryRace.event_date, todayIso))}` : 'Set race'}
-        </Text>
-        <Text style={[styles.raceNameText, { color: withAlpha(theme.onPrimary, 0.45) }]} numberOfLines={2}>
-          {primaryRace?.title ?? 'No race goal yet'}
-        </Text>
-      </View>
     </View>
   );
 }
@@ -117,8 +123,13 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_400Regular',
     fontSize: 13,
   },
-  levelBadge: {
+  levelMetaRow: {
     marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  levelBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
     borderWidth: 1,
@@ -130,6 +141,12 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_500Medium',
     fontSize: 11,
     color: '#C97E2F',
+  },
+  raceMetaInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+    gap: 6,
   },
   navScroll: {
     flexGrow: 1,
@@ -162,20 +179,20 @@ const styles = StyleSheet.create({
   navLabelActive: {
     color: '#F6F3EE',
   },
-  bottomMeta: {
-    flexShrink: 0,
-    marginTop: 12,
-  },
   countdownText: {
     fontFamily: 'DMSans_500Medium',
     fontSize: 12,
     color: '#C97E2F',
   },
-  raceNameText: {
-    marginTop: 4,
+  centerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  raceNameInline: {
     fontFamily: 'DMSans_400Regular',
     fontSize: 11,
     color: 'rgba(246,243,238,0.4)',
-    lineHeight: 15,
+    flexShrink: 1,
   },
 });

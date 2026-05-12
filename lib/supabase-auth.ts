@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import { readAthleteId } from '@/lib/athlete-session';
+import { SINGLE_ACCOUNT_ATHLETE_ID } from '@/lib/single-account';
 
 /**
  * Ensures the Supabase client has an authenticated JWT so strict RLS
@@ -21,6 +23,15 @@ export async function ensureSupabaseAuthUser(): Promise<{ id: string }> {
     return { id: session.user.id };
   }
 
+  // Temporary single-account mode: never create a new anonymous account.
+  // Use the known athlete id fallback so the app keeps targeting one profile.
+  const storedId = await readAthleteId();
+  if (storedId) {
+    return { id: storedId };
+  }
+  return { id: SINGLE_ACCOUNT_ATHLETE_ID };
+
+  /*
   const { data, error } = await supabase.auth.signInAnonymously();
 
   if (error) {
@@ -46,6 +57,7 @@ export async function ensureSupabaseAuthUser(): Promise<{ id: string }> {
   }
 
   return { id: data.user.id };
+  */
 }
 
 /**
