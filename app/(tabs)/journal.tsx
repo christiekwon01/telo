@@ -20,7 +20,7 @@ import { DailyReflectionSheet } from '@/components/DailyReflectionSheet';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { JournalHabitManagerModal } from '@/components/JournalHabitManagerModal';
 import { StatusAreaFade } from '@/components/status-area-fade';
-import { TabHeader } from '@/components/tab-header';
+import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   calendarDayStreak,
@@ -166,7 +166,7 @@ export default function JournalScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <View style={styles.titleWrap}>
-            <TabHeader title="Journal" paddingHorizontal={0} />
+            <TabHeader title="Journal" />
           </View>
           <View style={styles.topActions}>
             <Pressable style={styles.iconBtn} onPress={goToday}>
@@ -470,10 +470,14 @@ function JournalDayDetailModal({
 function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: theme.base },
-    content: { paddingHorizontal: 20, paddingBottom: 140 },
+    content: {
+      paddingHorizontal: TAB_SCREEN_PADDING_HORIZONTAL,
+      paddingTop: TAB_SCREEN_CONTENT_PADDING_TOP,
+      paddingBottom: 140,
+    },
     topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
     titleWrap: { flex: 1, minWidth: 0 },
-    topActions: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
+    topActions: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
     iconBtn: { padding: 8 },
     todayPill: {
       fontFamily: 'DMSans_500Medium',

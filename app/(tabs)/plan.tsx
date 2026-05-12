@@ -3,14 +3,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Modal, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, ToastAndroid, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { FlexWeekSheet } from '@/components/FlexWeekSheet';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { ImportPlanSheet } from '@/components/ImportPlanSheet';
 import { getSportIcon } from '@/components/sport-icon';
 import { SkeletonBlock } from '@/components/loading-ui';
-import { TabHeader } from '@/components/tab-header';
+import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { sessionQueryKeys, useActiveAthlete, useMonthSessions, useRaceGoals, useWeekSessions } from '@/hooks/useSessionData';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -803,11 +803,11 @@ export default function PlanScreen() {
   );
 
   return (
-    <View style={[styles.screen, themed.screen]}>
+    <SafeAreaView style={[styles.screen, themed.screen]} edges={['top', 'left', 'right']}>
       <StatusAreaFade height={insets.top + 8} />
       <ScrollView
         ref={tabScrollRef}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isDragging}
         scrollEventThrottle={16}
@@ -821,7 +821,6 @@ export default function PlanScreen() {
         }>
         <TabHeader
           title="Plan"
-          paddingHorizontal={0}
           right={
             <>
               <Pressable
@@ -1266,7 +1265,7 @@ export default function PlanScreen() {
         </View>
       </Modal>
       <FloatingPillNav active="plan" />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -1276,7 +1275,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F3EE',
   },
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: TAB_SCREEN_PADDING_HORIZONTAL,
+    paddingTop: TAB_SCREEN_CONTENT_PADDING_TOP,
     paddingBottom: 130,
     gap: 16,
   },

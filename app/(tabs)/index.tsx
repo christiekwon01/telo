@@ -24,7 +24,7 @@ import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { DailyReflectionSheet } from '@/components/DailyReflectionSheet';
 import { SkeletonBlock } from '@/components/loading-ui';
 import { getSportIcon } from '@/components/sport-icon';
-import { TabHeader } from '@/components/tab-header';
+import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import { journalQueryKeys } from '@/hooks/useJournalAndHabits';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
@@ -514,7 +514,6 @@ export default function HomeScreen() {
         <TabHeader
           title={headerGreeting}
           subtitle={headerSubtitle}
-          paddingHorizontal={0}
           right={
             <TouchableOpacity
               activeOpacity={0.85}
@@ -809,8 +808,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F3EE',
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
+    paddingHorizontal: TAB_SCREEN_PADDING_HORIZONTAL,
+    paddingTop: TAB_SCREEN_CONTENT_PADDING_TOP,
     paddingBottom: 150,
     gap: 16,
   },

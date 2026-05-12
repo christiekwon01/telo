@@ -22,7 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { StatusAreaFade } from '@/components/status-area-fade';
-import { TabHeader } from '@/components/tab-header';
+import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
 import { ensureAthleteRowExists, ensureSupabaseAuthUser } from '@/lib/supabase-auth';
@@ -533,7 +533,7 @@ export default function ProgressScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}>
-        <TabHeader title="Progress" paddingHorizontal={0} />
+        <TabHeader title="Progress" />
 
         <View style={styles.levelProgressSection}>
           <View style={styles.levelHeaderRow}>
@@ -875,7 +875,12 @@ export default function ProgressScreen() {
 const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: theme.base },
-    content: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 140, gap: 14 },
+    content: {
+      paddingHorizontal: TAB_SCREEN_PADDING_HORIZONTAL,
+      paddingTop: TAB_SCREEN_CONTENT_PADDING_TOP,
+      paddingBottom: 140,
+      gap: 14,
+    },
     segmentWrap: {
       marginTop: -2,
       flexDirection: 'row',

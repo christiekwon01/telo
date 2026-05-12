@@ -13,10 +13,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { StatusAreaFade } from '@/components/status-area-fade';
+import { TAB_SCREEN_HEADER_STACK_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import { invalidateSessionRelatedQueries, useActiveAthlete } from '@/hooks/useSessionData';
 import { ensureAthleteRowExists, ensureSupabaseAuthUser } from '@/lib/supabase-auth';
@@ -254,13 +255,11 @@ export default function IntelligenceScreen() {
         safe: { flex: 1, backgroundColor: theme.base },
         header: {
           flexDirection: 'row',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          // Extra top padding prevents TabHeader title from clipping under the notch/status area.
-          paddingTop: Math.max(insets.top, 12) + 6,
-          paddingBottom: 12,
-          minHeight: Math.max(insets.top, 12) + 52,
+          paddingHorizontal: TAB_SCREEN_PADDING_HORIZONTAL,
+          paddingTop: TAB_SCREEN_HEADER_STACK_PADDING_TOP,
+          paddingBottom: 10,
           backgroundColor: theme.base,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: theme.border,
@@ -278,6 +277,7 @@ export default function IntelligenceScreen() {
           alignItems: 'center',
           justifyContent: 'center',
           marginLeft: 8,
+          paddingTop: 6,
         },
         suggestionPill: {
           flexGrow: 1,
@@ -474,7 +474,7 @@ export default function IntelligenceScreen() {
           color: theme.onPrimary,
         },
       }),
-    [insets.top, theme]
+    [theme]
   );
 
   const scrollBottom = () => {
@@ -792,8 +792,8 @@ export default function IntelligenceScreen() {
   const bottomPad = Math.max(insets.bottom, 12) + 88;
 
   return (
-    <View style={stylesThemed.safe}>
-      <StatusAreaFade height={60} />
+    <SafeAreaView style={stylesThemed.safe} edges={['top', 'left', 'right']}>
+      <StatusAreaFade height={insets.top + 8} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -815,7 +815,11 @@ export default function IntelligenceScreen() {
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 }}
+          contentContainerStyle={{
+            paddingHorizontal: TAB_SCREEN_PADDING_HORIZONTAL,
+            paddingTop: 12,
+            paddingBottom: 16,
+          }}
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={scrollBottom}>
           {athleteLoading || loadingHistory ? (
@@ -1029,7 +1033,7 @@ export default function IntelligenceScreen() {
       </KeyboardAvoidingView>
 
       <FloatingPillNav active="rova" />
-    </View>
+    </SafeAreaView>
   );
 }
 

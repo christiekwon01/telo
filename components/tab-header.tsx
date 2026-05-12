@@ -3,6 +3,18 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { withAlpha } from '@/lib/theme-utils';
 
+/** Horizontal padding for main tab `ScrollView` content (`TabHeader` uses `paddingHorizontal` 0). */
+export const TAB_SCREEN_PADDING_HORIZONTAL = 20;
+
+/** Vertical gap from safe-area content top to the tab heading (with `TabHeader` root `paddingTop`). */
+export const TAB_SCREEN_CONTENT_PADDING_TOP = 10;
+
+/**
+ * For fixed headers that should align with `TabHeader` in a scroll:
+ * `TAB_SCREEN_CONTENT_PADDING_TOP` + `TabHeader` root `paddingTop`.
+ */
+export const TAB_SCREEN_HEADER_STACK_PADDING_TOP = TAB_SCREEN_CONTENT_PADDING_TOP + 2;
+
 export type TabHeaderProps = {
   title: string;
   subtitle?: string | null;
@@ -15,7 +27,7 @@ export function TabHeader({
   title,
   subtitle,
   right,
-  paddingHorizontal = 16,
+  paddingHorizontal = 0,
   paddingBottom = 10,
 }: TabHeaderProps) {
   const { theme } = useTheme();

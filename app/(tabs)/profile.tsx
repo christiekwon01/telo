@@ -22,7 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { RovaIntelligenceDevTools } from '@/components/RovaIntelligenceDevTools';
 import { StatusAreaFade } from '@/components/status-area-fade';
-import { TabHeader } from '@/components/tab-header';
+import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sessionQueryKeys, useActiveAthlete } from '@/hooks/useSessionData';
 import { journalQueryKeys } from '@/hooks/useJournalAndHabits';
@@ -311,7 +311,7 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}>
-        <TabHeader title="Profile" paddingHorizontal={0} />
+        <TabHeader title="Profile" />
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Account</Text>
           <View style={styles.inlineEditRow}>
@@ -603,8 +603,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       backgroundColor: theme.base,
     },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingHorizontal: TAB_SCREEN_PADDING_HORIZONTAL,
+    paddingTop: TAB_SCREEN_CONTENT_PADDING_TOP,
     paddingBottom: 140,
   },
   subHeading: {
