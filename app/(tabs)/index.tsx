@@ -1,11 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  Animated,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -13,7 +9,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   ToastAndroid,
   TouchableOpacity,
   View,
@@ -58,12 +53,6 @@ function addDays(value: Date, days: number) {
   next.setDate(next.getDate() + days);
   return next;
 }
-
-const WEEKLY_INTENTION_EXAMPLES = [
-  'Protect sleep this week and keep easy days truly easy.',
-  'Nail consistency: complete planned sessions before adding extras.',
-  'Travel week: prioritize short quality sessions and mobility.',
-];
 
 /** When Rova API is unavailable, keep the card conversational from local cues. */
 function buildCoachDirectiveFallback(
@@ -118,19 +107,13 @@ export default function HomeScreen() {
   const nextLevel = levelProgress.nextLevel;
   const atPeakTier = levelProgress.atPeakTier;
   const weekStart = useMemo(() => getWeekStartMonday(new Date()), []);
-  const weekStartIso = useMemo(() => toLocalIsoDate(weekStart), [weekStart]);
-  const intentionStorageKey = useMemo(() => `weekly_intention:${weekStartIso}`, [weekStartIso]);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => toLocalIsoDate(addDays(weekStart, i))), [weekStart]);
   const { data: weekSessionsByDate = {}, isLoading: weekLoading } = useWeekSessions(weekStart);
-  const [isIntentionsOpen, setIsIntentionsOpen] = useState(false);
-  const [weeklyIntention, setWeeklyIntention] = useState('');
-  const [intentionDraft, setIntentionDraft] = useState('');
   const [isFlexWeekOpen, setIsFlexWeekOpen] = useState(false);
   const [flexInitialReason, setFlexInitialReason] = useState<'Catch up' | undefined>(undefined);
   const [showCatchupNudge, setShowCatchupNudge] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [reflectTodayOpen, setReflectTodayOpen] = useState(false);
-  const intentionSheetY = useRef(new Animated.Value(420)).current;
   const { todaysChallenge, maybeGenerateForWeek } = useWeeklyChallenges(athlete?.id);
 
   const todayDate = useMemo(() => {
@@ -243,50 +226,6 @@ export default function HomeScreen() {
     weekStats.doneCount,
     weekStats.totalCount,
   ]);
-
-  const openIntentionsSheet = () => {
-    setIsIntentionsOpen(true);
-    Animated.spring(intentionSheetY, {
-      toValue: 0,
-      useNativeDriver: true,
-      damping: 20,
-      stiffness: 180,
-      mass: 0.9,
-    }).start();
-  };
-
-  const closeIntentionsSheet = () => {
-    Animated.timing(intentionSheetY, {
-      toValue: 420,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        setIsIntentionsOpen(false);
-      }
-    });
-  };
-
-  const openIntentionsEditor = () => {
-    setIntentionDraft(weeklyIntention);
-    openIntentionsSheet();
-  };
-
-  const saveWeeklyIntention = async () => {
-    const trimmed = intentionDraft.trim();
-    try {
-      await AsyncStorage.setItem(intentionStorageKey, trimmed);
-      setWeeklyIntention(trimmed);
-      if (Platform.OS === 'android') {
-        ToastAndroid.show('Weekly intention saved', ToastAndroid.SHORT);
-      } else {
-        Alert.alert('Saved', 'Weekly intention updated.');
-      }
-      closeIntentionsSheet();
-    } catch {
-      Alert.alert('Could not save', 'Please try again.');
-    }
-  };
 
   const openFlexWeekSheet = (presetReason?: 'Catch up') => {
     setFlexInitialReason(presetReason);
@@ -415,27 +354,6 @@ export default function HomeScreen() {
     void checkMissedStreak();
   }, [athlete?.id, todayIso]);
 
-  useEffect(() => {
-    let active = true;
-    const loadWeeklyIntention = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(intentionStorageKey);
-        if (!active) return;
-        const value = stored?.trim() ?? '';
-        setWeeklyIntention(value);
-        setIntentionDraft(value);
-      } catch {
-        if (!active) return;
-        setWeeklyIntention('');
-        setIntentionDraft('');
-      }
-    };
-    void loadWeeklyIntention();
-    return () => {
-      active = false;
-    };
-  }, [intentionStorageKey]);
-
   const onRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([
@@ -464,10 +382,6 @@ export default function HomeScreen() {
       cardText: { color: theme.primary },
       mutedText: { color: theme.textMuted },
       accentText: { color: theme.accent },
-      primaryButton: { backgroundColor: theme.primary },
-      primaryButtonText: { color: theme.onPrimary },
-      modalSheet: { backgroundColor: theme.base },
-      modalHandle: { backgroundColor: withAlpha(theme.primary, 0.2) },
       iconWrap: { backgroundColor: theme.primary },
       accentDot: { backgroundColor: theme.accent },
       subtleText: { color: withAlpha(theme.primary, 0.4) },
@@ -485,16 +399,10 @@ export default function HomeScreen() {
       dayDotRest: { backgroundColor: withAlpha(theme.primary, 0.2) },
       todayRing: { borderColor: theme.accent },
       todayInner: { backgroundColor: theme.primary },
-      intentionsBanner: { backgroundColor: withAlpha(theme.accent, 0.12) },
-      intentionsIcon: { color: theme.accent },
-      intentionsText: { color: theme.primary },
       weeklyDivider: { backgroundColor: withAlpha(theme.primary, 0.12) },
       statValue: { color: theme.primary },
       sessionsError: { color: theme.accent },
       cardDoneBadge: { backgroundColor: theme.accent, borderColor: theme.base },
-      modalOverlay: { backgroundColor: withAlpha('#000000', 0.42) },
-      sheetIcon: { color: theme.onPrimary },
-      flagCircle: { borderColor: theme.primary },
       flexNudge: { borderColor: withAlpha(theme.accent, 0.26), backgroundColor: withAlpha(theme.accent, 0.12) },
       flexNudgeText: { color: theme.primary },
     }),
@@ -622,26 +530,6 @@ export default function HomeScreen() {
             })}
           </View>
 
-          <View style={styles.intentionSummaryRow}>
-            {weeklyIntention ? (
-              <Text style={[styles.intentionSummaryText, themeStyles.mutedText]} numberOfLines={3}>
-                {weeklyIntention}
-              </Text>
-            ) : (
-              <Text style={[styles.intentionSummaryPlaceholder, themeStyles.subtleText]}>
-                Add a weekly intention to keep your training focused.
-              </Text>
-            )}
-            <Pressable
-              style={[styles.intentionEditIconButton, themeStyles.intentionsBanner]}
-              onPress={openIntentionsEditor}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={weeklyIntention ? 'Edit weekly intention' : 'Set weekly intention'}>
-              <Ionicons name="pencil" size={12} color={themeStyles.intentionsIcon.color} />
-            </Pressable>
-          </View>
-
           <View style={[styles.weeklyDivider, themeStyles.weeklyDivider]} />
           <View style={styles.statsRow}>
             {[
@@ -765,48 +653,6 @@ export default function HomeScreen() {
           }}
         />
       ) : null}
-
-      <Modal transparent visible={isIntentionsOpen} animationType="none" onRequestClose={closeIntentionsSheet}>
-        <View style={styles.modalRoot}>
-          <Pressable style={[styles.modalOverlay, themeStyles.modalOverlay]} onPress={closeIntentionsSheet} />
-          <Animated.View style={[styles.sheet, themeStyles.modalSheet, { transform: [{ translateY: intentionSheetY }] }]}>
-            <View style={[styles.sheetHandle, themeStyles.modalHandle]} />
-            <Pressable style={styles.sheetCloseButton} onPress={closeIntentionsSheet} hitSlop={8}>
-              <Ionicons name="close" size={16} color={theme.primary} />
-            </Pressable>
-            <Text style={[styles.sheetTitle, themeStyles.cardText]}>Weekly intentions</Text>
-            <Text style={[styles.sheetDescription, themeStyles.mutedText]}>
-              Write your focus for the week. This saves for the current week and can be updated anytime.
-            </Text>
-            <TextInput
-              value={intentionDraft}
-              onChangeText={setIntentionDraft}
-              multiline
-              placeholder={`Examples:\n- ${WEEKLY_INTENTION_EXAMPLES.join('\n- ')}`}
-              placeholderTextColor={withAlpha(theme.text, 0.4)}
-              style={[styles.intentionInput, { color: theme.text, borderColor: withAlpha(theme.primary, 0.14), backgroundColor: theme.surface }]}
-            />
-            <View style={styles.examplePills}>
-              {WEEKLY_INTENTION_EXAMPLES.map((item) => (
-                <Pressable
-                  key={item}
-                  style={[styles.examplePill, { borderColor: withAlpha(theme.primary, 0.12), backgroundColor: withAlpha(theme.primary, 0.04) }]}
-                  onPress={() => setIntentionDraft(item)}>
-                  <Text style={[styles.examplePillText, themeStyles.cardText]} numberOfLines={1}>
-                    {item}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={[styles.sheetPrimaryButton, themeStyles.primaryButton]}
-              onPress={() => void saveWeeklyIntention()}>
-              <Text style={[styles.sheetPrimaryButtonText, themeStyles.primaryButtonText]}>Save intentions</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </Modal>
 
       <FlexWeekSheet
         visible={isFlexWeekOpen}
@@ -1002,37 +848,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#0F2840',
   },
-  intentionSummaryRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  intentionEditIconButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(201,126,47,0.12)',
-    marginTop: 1,
-    flexShrink: 0,
-  },
-  intentionSummaryText: {
-    flex: 1,
-    fontFamily: 'DMSans-Regular',
-    fontSize: 12,
-    lineHeight: 17,
-    color: '#0F2840',
-  },
-  intentionSummaryPlaceholder: {
-    flex: 1,
-    fontFamily: 'DMSans-Regular',
-    fontSize: 12,
-    color: 'rgba(15,40,64,0.45)',
-  },
   weeklyDivider: {
-    marginTop: 10,
+    marginTop: 14,
     marginBottom: 10,
     height: 1,
     backgroundColor: 'rgba(15,40,64,0.12)',
@@ -1252,139 +1069,6 @@ const styles = StyleSheet.create({
     borderColor: '#F6F3EE',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.42)',
-  },
-  sheet: {
-    backgroundColor: '#F6F3EE',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 34,
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 42,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15,40,64,0.2)',
-    marginBottom: 16,
-  },
-  sheetCloseButton: {
-    position: 'absolute',
-    top: 10,
-    right: 14,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  sheetIconWrap: {
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  sheetIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#0F2840',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetLabel: {
-    textAlign: 'center',
-    fontFamily: 'DMSans-SemiBold',
-    fontSize: 11,
-    color: '#C97E2F',
-    letterSpacing: 1.1,
-    marginBottom: 8,
-  },
-  sheetTitle: {
-    textAlign: 'center',
-    fontFamily: 'CormorantGaramond_700Bold',
-    fontSize: 36,
-    color: '#0F2840',
-    marginBottom: 8,
-  },
-  sheetDescription: {
-    textAlign: 'center',
-    fontFamily: 'DMSans-Regular',
-    fontSize: 13,
-    lineHeight: 19,
-    color: 'rgba(15,40,64,0.55)',
-    marginBottom: 16,
-  },
-  intentionInput: {
-    minHeight: 120,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontFamily: 'DMSans-Regular',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlignVertical: 'top',
-    marginBottom: 10,
-  },
-  examplePills: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  examplePill: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  examplePillText: {
-    fontFamily: 'DMSans-Regular',
-    fontSize: 12,
-  },
-  sheetPrimaryButton: {
-    width: '100%',
-    borderRadius: 999,
-    backgroundColor: '#0F2840',
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sheetPrimaryButtonText: {
-    fontFamily: 'DMSans-Medium',
-    color: '#F6F3EE',
-    fontSize: 15,
-  },
-  sheetSkipText: {
-    textAlign: 'center',
-    fontFamily: 'DMSans-Medium',
-    color: 'rgba(15,40,64,0.4)',
-    fontSize: 14,
-  },
-  flagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  flagCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 1.3,
-    borderColor: '#0F2840',
-  },
-  flagText: {
-    fontFamily: 'DMSans-Regular',
-    fontSize: 14,
-    color: '#0F2840',
   },
   flexNudge: {
     borderRadius: 12,

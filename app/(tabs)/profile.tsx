@@ -282,7 +282,7 @@ export default function ProfileScreen() {
   };
 
   const trainingDataResetExplanation =
-    'This permanently deletes all your planned and completed sessions, completion logs, step-by-step blocks, personal bests, Rova challenges, flex-week history, and locally saved weekly intentions. Plan and week views refresh so the calendar clears. Your active plan row and goal races are not removed. This cannot be undone.';
+    'This permanently deletes all your planned and completed sessions, completion logs, step-by-step blocks, personal bests, Rova challenges, and flex-week history. Plan and week views refresh so the calendar clears. Your active plan row and goal races are not removed. This cannot be undone.';
 
   const handleResetTrainingData = () => {
     if (isResettingTrainingData) return;
