@@ -12,6 +12,7 @@ import { SessionRemoveIconButton } from '@/components/session-remove-icon-button
 import { getSportIcon } from '@/components/sport-icon';
 import { SkeletonBlock } from '@/components/loading-ui';
 import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
+import { WeekPickerDateField } from '@/components/week-picker-date-field';
 import { usePromptRemoveSession } from '@/hooks/usePromptRemoveSession';
 import { sessionQueryKeys, useActiveAthlete, useMonthSessions, useRaceGoals, useWeekSessions } from '@/hooks/useSessionData';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
@@ -322,76 +323,77 @@ function WeekSessionCard({ session, onPress, onLongPress, onRemovePress, onDrop,
         },
         { transform: [{ translateX }, { translateY }] },
         isActiveDrag ? styles.weekSessionCardDragging : null,
-      ]}
-      {...panHandlers}>
+      ]}>
       <View style={styles.weekSessionCardInner}>
-        <Pressable
-          style={styles.weekSessionPressableMain}
-          onPressIn={() => {
-            if (isWeb && canDrag) {
+        <Animated.View {...panHandlers} style={styles.weekSessionPanRegion}>
+          <Pressable
+            style={styles.weekSessionPressableMain}
+            onPressIn={() => {
+              if (isWeb && canDrag) {
+                setIsDragPrimed(true);
+              }
+            }}
+            onPressOut={() => {
+              if (isWeb && !isActiveDrag) {
+                setIsDragPrimed(false);
+              }
+            }}
+            onPress={() => {
+              if (isActiveDrag || isDragPrimed || suppressPressRef.current) return;
+              if (session.id) {
+                onPress(session.id);
+              }
+            }}
+            onLongPress={() => {
+              if (!canDrag) {
+                if (session.id) onLongPress?.(session.id);
+                return;
+              }
               setIsDragPrimed(true);
-            }
-          }}
-          onPressOut={() => {
-            if (isWeb && !isActiveDrag) {
-              setIsDragPrimed(false);
-            }
-          }}
-          onPress={() => {
-            if (isActiveDrag || isDragPrimed || suppressPressRef.current) return;
-            if (session.id) {
-              onPress(session.id);
-            }
-          }}
-          onLongPress={() => {
-            if (!canDrag) {
-              if (session.id) onLongPress?.(session.id);
-              return;
-            }
-            setIsDragPrimed(true);
-            suppressPressRef.current = true;
-            setTimeout(() => {
-              suppressPressRef.current = false;
-            }, 260);
-          }}>
-          {completed ? (
-            <View style={styles.weekSessionCheckCol}>
-              <View style={[styles.weekSessionCheckBubble, { backgroundColor: theme.accent }]}>
-                <Ionicons name="checkmark" size={14} color={theme.surface} />
+              suppressPressRef.current = true;
+              setTimeout(() => {
+                suppressPressRef.current = false;
+              }, 260);
+            }}>
+            {completed ? (
+              <View style={styles.weekSessionCheckCol}>
+                <View style={[styles.weekSessionCheckBubble, { backgroundColor: theme.accent }]}>
+                  <Ionicons name="checkmark" size={14} color={theme.surface} />
+                </View>
               </View>
+            ) : null}
+            <View style={[styles.weekSessionIconWrap, { backgroundColor: theme.primary }]}>
+              {getSportIcon(session.sport, 16, theme.surface)}
+              <View style={[styles.weekSessionIconAccentDot, { backgroundColor: theme.accent }]} />
             </View>
-          ) : null}
-          <View style={[styles.weekSessionIconWrap, { backgroundColor: theme.primary }]}>
-            {getSportIcon(session.sport, 16, theme.surface)}
-            <View style={[styles.weekSessionIconAccentDot, { backgroundColor: theme.accent }]} />
-          </View>
-          <View style={styles.weekSessionCopy}>
-            <Text
-              style={[
-                styles.weekSessionTitle,
-                { color: completed ? withAlpha(theme.text, 0.72) : theme.text },
-              ]}
-              numberOfLines={1}>
-              {session.title}
-            </Text>
-            <Text style={[styles.weekSessionMeta, { color: theme.textMuted }]} numberOfLines={1}>
-              {formatWeekSessionSubtitle(session)}
-              {completed ? (
-                <>
-                  {' · '}
-                  <Text style={{ color: theme.accent }}>Completed</Text>
-                </>
-              ) : null}
-            </Text>
-          </View>
-        </Pressable>
+            <View style={styles.weekSessionCopy}>
+              <Text
+                style={[
+                  styles.weekSessionTitle,
+                  { color: completed ? withAlpha(theme.text, 0.72) : theme.text },
+                ]}
+                numberOfLines={1}>
+                {session.title}
+              </Text>
+              <Text style={[styles.weekSessionMeta, { color: theme.textMuted }]} numberOfLines={1}>
+                {formatWeekSessionSubtitle(session)}
+                {completed ? (
+                  <>
+                    {' · '}
+                    <Text style={{ color: theme.accent }}>Completed</Text>
+                  </>
+                ) : null}
+              </Text>
+            </View>
+          </Pressable>
+        </Animated.View>
+        {onRemovePress && session.id ? (
+          <SessionRemoveIconButton
+            iconColor={withAlpha(theme.primary, 0.45)}
+            onPress={() => onRemovePress(session)}
+          />
+        ) : null}
         <View style={styles.weekSessionTrailing}>
-          {onRemovePress && session.id ? (
-            <SessionRemoveIconButton
-              iconColor={withAlpha(theme.primary, 0.45)}
-              onPress={() => onRemovePress(session)}
-            />
-          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Session details"
@@ -1273,26 +1275,42 @@ export default function PlanScreen() {
           </Pressable>
           <Text style={[styles.weekPickerTitle, themed.cardText]}>Choose a week</Text>
           <View style={styles.weekPickerCalendarWrap}>
-            <DateTimePicker
-              {...datePickerMondayWeekProps()}
-              value={weekPickerDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
-              themeVariant={weekPickerThemeVariant}
-              accentColor={theme.primary}
-              textColor={theme.text}
-              onChange={(_event, selected) => {
-                if (!selected) {
-                  if (Platform.OS !== 'ios') closeWeekPicker();
-                  return;
-                }
-                setWeekPickerDate(selected);
-                if (Platform.OS !== 'ios') {
-                  applyWeekPickerDate(selected);
-                  closeWeekPicker();
-                }
-              }}
-            />
+            {Platform.OS === 'web' ? (
+              <>
+                <WeekPickerDateField
+                  value={weekPickerDate}
+                  onChange={(selected) => {
+                    setWeekPickerDate(selected);
+                    applyWeekPickerDate(selected);
+                    closeWeekPicker();
+                  }}
+                />
+                <Text style={[styles.weekPickerWebHint, themed.subtleText]}>
+                  Pick any day in that week — the plan always shows Monday through Sunday.
+                </Text>
+              </>
+            ) : (
+              <DateTimePicker
+                {...datePickerMondayWeekProps()}
+                value={weekPickerDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+                themeVariant={weekPickerThemeVariant}
+                accentColor={theme.primary}
+                textColor={theme.text}
+                onChange={(_event, selected) => {
+                  if (!selected) {
+                    if (Platform.OS !== 'ios') closeWeekPicker();
+                    return;
+                  }
+                  setWeekPickerDate(selected);
+                  if (Platform.OS !== 'ios') {
+                    applyWeekPickerDate(selected);
+                    closeWeekPicker();
+                  }
+                }}
+              />
+            )}
           </View>
           {Platform.OS === 'ios' ? (
             <Pressable
@@ -1791,6 +1809,12 @@ const styles = StyleSheet.create({
   weekPickerCalendarWrap: {
     marginTop: 6,
   },
+  weekPickerWebHint: {
+    marginTop: 10,
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+  },
   weekPickerApply: {
     marginTop: 10,
     borderRadius: 999,
@@ -1908,6 +1932,13 @@ const styles = StyleSheet.create({
   weekSessionCardInner: {
     flexDirection: 'row',
     alignItems: 'stretch',
+  },
+  weekSessionPanRegion: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+    alignSelf: 'stretch',
   },
   weekSessionPressableMain: {
     flex: 1,
