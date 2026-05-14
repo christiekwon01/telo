@@ -321,11 +321,69 @@ export function ImportPlanSheet({
     await updateConflictDates(sessions);
   };
 
+  const buildCurrentManualParsedSession = useCallback((): ParsedSession | null => {
+    if (!manualDate || !title.trim()) return null;
+    return {
+      id: editingSessionId ?? undefined,
+      date: manualDate,
+      sport,
+      title: title.trim(),
+      durationMins: resolvedDurationMins,
+      distance: canDistance ? parseDistance(distance) : null,
+      distanceUnit: canDistance ? distanceUnit : null,
+      intensity,
+      description: description.trim() || null,
+      coachNote: coachNote.trim() || null,
+      blocks: manualBlocks.map((block) => ({
+        blockType: block.blockType,
+        title: block.title,
+        steps: block.steps.map((step) => step.trim()).filter(Boolean),
+      })),
+      source: 'manual',
+    };
+  }, [
+    manualDate,
+    title,
+    sport,
+    resolvedDurationMins,
+    canDistance,
+    distance,
+    distanceUnit,
+    intensity,
+    description,
+    coachNote,
+    manualBlocks,
+    editingSessionId,
+  ]);
+
   const doImport = async () => {
     if (!athleteId) {
       Alert.alert('No athlete profile', 'Please complete onboarding first.');
       return;
     }
+
+    const editingSingleSession = mode === 'manual' && Boolean(editingSessionId);
+
+    if (editingSingleSession && editingSessionId) {
+      const sessionToSave = buildCurrentManualParsedSession();
+      if (!sessionToSave) {
+        Alert.alert('Missing title', 'Please enter a session title.');
+        return;
+      }
+      setImporting(true);
+      try {
+        await upsertManualSession(athleteId, sessionToSave, 'edit', editingSessionId);
+        showFeedback('Session updated ✓');
+        onImported?.(sessionToSave.date);
+        closeSheet();
+      } catch (error) {
+        Alert.alert('Import failed', error instanceof Error ? error.message : 'Unknown error');
+      } finally {
+        setImporting(false);
+      }
+      return;
+    }
+
     if (!previewSessions.length) {
       Alert.alert('No sessions', 'Please parse or build sessions first.');
       return;
@@ -333,18 +391,12 @@ export function ImportPlanSheet({
     setImporting(true);
     try {
       let imported = 0;
-      const isSingleEdit = Boolean(mode === 'manual' && editingSessionId && previewSessions.length === 1);
-      if (isSingleEdit && editingSessionId) {
-        await upsertManualSession(athleteId, previewSessions[0], 'edit', editingSessionId);
-        imported = 1;
-      } else {
-        const result = await importSessions(athleteId, previewSessions, conflictResolution);
-        imported = result.imported;
-        if (result.errors.length > 0) {
-          Alert.alert('Imported with some issues', result.errors.slice(0, 4).join('\n'));
-        }
+      const result = await importSessions(athleteId, previewSessions, conflictResolution);
+      imported = result.imported;
+      if (result.errors.length > 0) {
+        Alert.alert('Imported with some issues', result.errors.slice(0, 4).join('\n'));
       }
-      showFeedback(isSingleEdit ? 'Session updated ✓' : `${imported} sessions imported ✓`);
+      showFeedback(`${imported} sessions imported ✓`);
       onImported?.(previewSessions[0]?.date);
       closeSheet();
     } catch (error) {

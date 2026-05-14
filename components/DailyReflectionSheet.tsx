@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -41,6 +42,7 @@ type Props = {
 };
 
 export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso, onSaved }: Props) {
+  const router = useRouter();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -53,8 +55,8 @@ export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso
   const { data: streakData } = useJournalStreakData(athleteId);
 
   const [bodyText, setBodyText] = useState('');
-  const [mood, setMood] = useState<number>(3);
-  const [energy, setEnergy] = useState<number>(3);
+  const [mood, setMood] = useState<number | null>(null);
+  const [energy, setEnergy] = useState<number | null>(null);
   const [sleepQuality, setSleepQuality] = useState<number | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
@@ -62,13 +64,13 @@ export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso
     if (!visible) return;
     if (remote) {
       setBodyText(remote.body_text ?? '');
-      setMood(remote.mood ?? 3);
-      setEnergy(remote.energy ?? 3);
+      setMood(remote.mood ?? null);
+      setEnergy(remote.energy ?? null);
       setSleepQuality(remote.sleep_quality ?? null);
     } else {
       setBodyText('');
-      setMood(3);
-      setEnergy(3);
+      setMood(null);
+      setEnergy(null);
       setSleepQuality(null);
     }
   }, [visible, remote]);
@@ -155,29 +157,43 @@ export function DailyReflectionSheet({ visible, onClose, athleteId, entryDateIso
             <View style={styles.contextCard}>
               <Text style={styles.contextTitle}>Completed today</Text>
               {completedContext.map((s) => (
-                <Text key={s.id} style={styles.contextLine}>
-                  • {s.title} ({s.sport})
-                  {s.duration_mins != null ? ` · ${s.duration_mins} min` : ''}
-                </Text>
+                <Pressable
+                  key={s.id}
+                  style={styles.contextRowPressable}
+                  onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                  <Text style={styles.contextLine} numberOfLines={2}>
+                    • {s.title} ({s.sport})
+                    {s.duration_mins != null ? ` · ${s.duration_mins} min` : ''}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                </Pressable>
               ))}
             </View>
           ) : null}
 
-          <Text style={styles.fieldLabel}>Mood</Text>
+          <Text style={styles.fieldLabel}>Mood (optional)</Text>
           <View style={styles.moodRow}>
             {MOOD_EMOJIS.map((emo, idx) => {
               const val = idx + 1;
               const on = mood === val;
               return (
-                <Pressable key={emo} onPress={() => setMood(val)} style={[styles.moodBtn, on ? styles.moodBtnOn : null]}>
+                <Pressable
+                  key={emo}
+                  onPress={() => setMood((prev) => (prev === val ? null : val))}
+                  style={[styles.moodBtn, on ? styles.moodBtnOn : null]}>
                   <Text style={styles.moodEmoji}>{emo}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Text style={styles.fieldLabel}>Energy</Text>
-          <StarRow value={energy} onChange={setEnergy} theme={theme} />
+          <Text style={styles.fieldLabel}>Energy (optional)</Text>
+          <StarRow
+            value={energy ?? 0}
+            onChange={(v) => setEnergy(v === 0 ? null : v)}
+            theme={theme}
+            allowClear
+          />
 
           <Text style={styles.fieldLabel}>Sleep quality (optional)</Text>
           <StarRow value={sleepQuality ?? 0} onChange={(v) => setSleepQuality(v === 0 ? null : v)} theme={theme} allowClear />
@@ -306,7 +322,13 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
       marginBottom: 4,
     },
     contextTitle: { fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: theme.accent, marginBottom: 6 },
-    contextLine: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text, marginBottom: 2 },
+    contextRowPressable: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 4,
+    },
+    contextLine: { flex: 1, fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.text },
     fieldLabel: {
       fontFamily: 'DMSans_600SemiBold',
       fontSize: 11,

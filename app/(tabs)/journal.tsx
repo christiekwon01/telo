@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -19,6 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DailyReflectionSheet } from '@/components/DailyReflectionSheet';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { JournalHabitManagerModal } from '@/components/JournalHabitManagerModal';
+import { SessionRemoveIconButton } from '@/components/session-remove-icon-button';
 import { StatusAreaFade } from '@/components/status-area-fade';
 import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -30,8 +32,15 @@ import {
   useJournalHabits,
   useJournalStreakData,
   useMonthJournalIndicators,
+  useToggleHabitCompletionMutation,
 } from '@/hooks/useJournalAndHabits';
-import { useActiveAthlete, useMonthSessions, normalizeCompletionStatus, type SessionWithCompletion } from '@/hooks/useSessionData';
+import { usePromptRemoveSession, type RemovableSession } from '@/hooks/usePromptRemoveSession';
+import {
+  useActiveAthlete,
+  useMonthSessions,
+  normalizeCompletionStatus,
+  type SessionWithCompletion,
+} from '@/hooks/useSessionData';
 import { mondayBasedMonthLeadingDayCount, toLocalIsoDate } from '@/lib/dates';
 import { withAlpha } from '@/lib/theme-utils';
 import { shareJournalMarkdownExport } from '@/services/exportJournalMarkdown';
@@ -40,10 +49,12 @@ const DOT = { session: '#2E7D32', journal: '#7B2D42', both: '#D4A5A5' };
 
 export default function JournalScreen() {
   const { theme } = useTheme();
+  const router = useRouter();
   const { data: athlete } = useActiveAthlete();
   const athleteId = athlete?.id ?? '';
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const { promptRemoveSession } = usePromptRemoveSession(athleteId || undefined);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const isWeb = Platform.OS === 'web';
 
@@ -59,6 +70,26 @@ export default function JournalScreen() {
   const { data: monthBundle, isLoading: monthLoading } = useMonthJournalIndicators(athleteId || null, year, month);
   const { data: streakData } = useJournalStreakData(athleteId || null);
   const { data: habits = [] } = useJournalHabits(athleteId || null);
+  const toggleHabit = useToggleHabitCompletionMutation(athleteId || undefined);
+
+  const todaysSessionsByStatus = useMemo(() => {
+    const all = sessions.filter((s) => s.scheduled_date === todayIso);
+    const completed = all.filter((s) => normalizeCompletionStatus(s.status, s.session_logs as never) === 'completed');
+    const planned = all.filter((s) => normalizeCompletionStatus(s.status, s.session_logs as never) !== 'completed');
+    return { planned, completed };
+  }, [sessions, todayIso]);
+
+  const onToggleTodayHabit = useCallback(
+    (habitId: string) => {
+      const done = monthBundle?.habitCompletionsByDate.get(todayIso) ?? new Set<string>();
+      const completed = !done.has(habitId);
+      if (Platform.OS !== 'web') {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      void toggleHabit.mutateAsync({ habitId, dateIso: todayIso, completed });
+    },
+    [monthBundle, todayIso, toggleHabit]
+  );
 
   const [dayDetailIso, setDayDetailIso] = useState<string | null>(null);
   const [reflectIso, setReflectIso] = useState<string | null>(null);
@@ -348,6 +379,118 @@ export default function JournalScreen() {
               );
             })()}
 
+            {athleteId &&
+            (habits.length > 0 ||
+              todaysSessionsByStatus.planned.length > 0 ||
+              todaysSessionsByStatus.completed.length > 0) ? (
+              <View style={styles.todayCard}>
+                <Text style={styles.todayCardTitle}>Today</Text>
+                {todaysSessionsByStatus.planned.length > 0 ? (
+                  <View style={styles.todayBlock}>
+                    <Text style={styles.todayBlockLabel}>Planned</Text>
+                    {todaysSessionsByStatus.planned.map((s) => (
+                      <View key={s.id} style={styles.todaySessionRow}>
+                        <Pressable
+                          style={styles.todaySessionMainPressable}
+                          onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                          <Text style={styles.todaySessionText} numberOfLines={2}>
+                            • {s.title} ({s.sport})
+                          </Text>
+                        </Pressable>
+                        <SessionRemoveIconButton
+                          iconColor={theme.textMuted}
+                          onPress={() =>
+                            promptRemoveSession({
+                              id: s.id,
+                              title: s.title,
+                              scheduled_date: s.scheduled_date,
+                              status: s.status,
+                              completionStatus: s.completionStatus,
+                            })
+                          }
+                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Session details"
+                          hitSlop={8}
+                          onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+                {todaysSessionsByStatus.completed.length > 0 ? (
+                  <View style={styles.todayBlock}>
+                    <Text style={styles.todayBlockLabel}>Completed</Text>
+                    {todaysSessionsByStatus.completed.map((s) => (
+                      <View key={s.id} style={styles.todaySessionRow}>
+                        <Pressable
+                          style={styles.todaySessionMainPressable}
+                          onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                          <Text style={styles.todaySessionText} numberOfLines={2}>
+                            • {s.title} ({s.sport})
+                            {s.duration_mins != null ? ` · ${s.duration_mins} min` : ''}
+                          </Text>
+                        </Pressable>
+                        <SessionRemoveIconButton
+                          iconColor={theme.textMuted}
+                          onPress={() =>
+                            promptRemoveSession({
+                              id: s.id,
+                              title: s.title,
+                              scheduled_date: s.scheduled_date,
+                              status: s.status,
+                              completionStatus: s.completionStatus,
+                            })
+                          }
+                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Session details"
+                          hitSlop={8}
+                          onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+                {habits.length > 0 ? (
+                  <View style={styles.todayBlock}>
+                    <Text style={styles.todayBlockLabel}>Habits</Text>
+                    <Text style={styles.todayHabitHint}>Tap to mark done for today.</Text>
+                    {habits.map((h) => {
+                      const done = (monthBundle?.habitCompletionsByDate.get(todayIso) ?? new Set<string>()).has(h.id);
+                      const dates = streakData?.habitCompletionByHabit.get(h.id) ?? new Set<string>();
+                      const streak = calendarDayStreak(dates, todayIso);
+                      const streakLabel = streak >= 3 ? `${streak} day streak` : null;
+                      return (
+                        <Pressable
+                          key={h.id}
+                          onPress={() => onToggleTodayHabit(h.id)}
+                          style={[
+                            styles.todayHabitCard,
+                            { backgroundColor: done ? withAlpha(theme.accent, 0.18) : withAlpha(theme.primary, 0.06) },
+                          ]}>
+                          <Text style={styles.todayHabitEmoji}>{h.icon_emoji}</Text>
+                          <View style={styles.todayHabitCopy}>
+                            <Text style={styles.todayHabitName}>{h.name}</Text>
+                            {streakLabel ? <Text style={styles.todayHabitStreak}>{streakLabel}</Text> : null}
+                          </View>
+                          <Ionicons
+                            name={done ? 'checkmark-circle' : 'ellipse-outline'}
+                            size={22}
+                            color={done ? theme.accent : theme.textMuted}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
             <Pressable style={styles.reflectCta} onPress={() => setReflectIso(todayIso)}>
               <Ionicons name="create-outline" size={18} color={theme.onPrimary} />
               <Text style={styles.reflectCtaText}>Reflect on today</Text>
@@ -377,6 +520,7 @@ export default function JournalScreen() {
           sessions={sessions.filter((s) => s.scheduled_date === dayDetailIso)}
           habitIdsDone={monthBundle?.habitCompletionsByDate.get(dayDetailIso) ?? new Set()}
           habits={habits}
+          onRemoveSession={promptRemoveSession}
           onClose={() => setDayDetailIso(null)}
           onEditReflection={(dateIso) => {
             setDayDetailIso(null);
@@ -446,6 +590,7 @@ function JournalDayDetailModal({
   sessions,
   habitIdsDone,
   habits,
+  onRemoveSession,
   onClose,
   onEditReflection,
 }: {
@@ -454,6 +599,7 @@ function JournalDayDetailModal({
   sessions: SessionWithCompletion[];
   habitIdsDone: Set<string>;
   habits: { id: string; name: string; icon_emoji: string }[];
+  onRemoveSession: (session: RemovableSession) => void;
   onClose: () => void;
   onEditReflection: (dateIso: string) => void;
 }) {
@@ -462,6 +608,19 @@ function JournalDayDetailModal({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { data: reflection } = useDailyReflectionQuery(athleteId, iso);
+  const toggleHabitDay = useToggleHabitCompletionMutation(athleteId);
+  const { data: habitStreakData } = useJournalStreakData(athleteId);
+
+  const onToggleDayHabit = useCallback(
+    (habitId: string) => {
+      const completed = !habitIdsDone.has(habitId);
+      if (Platform.OS !== 'web') {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      void toggleHabitDay.mutateAsync({ habitId, dateIso: iso, completed });
+    },
+    [habitIdsDone, iso, toggleHabitDay]
+  );
 
   const planned = sessions.filter((s) => normalizeCompletionStatus(s.status, s.session_logs as never) !== 'completed');
   const completed = sessions.filter((s) => normalizeCompletionStatus(s.status, s.session_logs as never) === 'completed');
@@ -470,7 +629,7 @@ function JournalDayDetailModal({
     reflection != null ||
     completed.length > 0 ||
     planned.length > 0 ||
-    habits.some((h) => habitIdsDone.has(h.id));
+    habits.length > 0;
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -496,14 +655,34 @@ function JournalDayDetailModal({
             <View style={styles.block}>
               <Text style={styles.blockTitle}>Planned</Text>
               {planned.map((s) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}
-                  style={styles.sessionRowPressable}>
-                  <Text style={[styles.line, styles.sessionLine]}>
-                    • {s.title} ({s.sport})
-                  </Text>
-                </Pressable>
+                <View key={s.id} style={styles.sessionRowPressable}>
+                  <Pressable
+                    style={styles.sessionRowMainPressable}
+                    onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                    <Text style={styles.sessionLineText} numberOfLines={2}>
+                      • {s.title} ({s.sport})
+                    </Text>
+                  </Pressable>
+                  <SessionRemoveIconButton
+                    iconColor={theme.textMuted}
+                    onPress={() =>
+                      onRemoveSession({
+                        id: s.id,
+                        title: s.title,
+                        scheduled_date: s.scheduled_date,
+                        status: s.status,
+                        completionStatus: s.completionStatus,
+                      })
+                    }
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Session details"
+                    hitSlop={8}
+                    onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                  </Pressable>
+                </View>
               ))}
             </View>
           ) : null}
@@ -512,15 +691,35 @@ function JournalDayDetailModal({
             <View style={styles.block}>
               <Text style={styles.blockTitle}>Completed</Text>
               {completed.map((s) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}
-                  style={styles.sessionRowPressable}>
-                  <Text style={[styles.line, styles.sessionLine]}>
-                    • {s.title} ({s.sport})
-                    {s.duration_mins != null ? ` · ${s.duration_mins} min` : ''}
-                  </Text>
-                </Pressable>
+                <View key={s.id} style={styles.sessionRowPressable}>
+                  <Pressable
+                    style={styles.sessionRowMainPressable}
+                    onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                    <Text style={styles.sessionLineText} numberOfLines={2}>
+                      • {s.title} ({s.sport})
+                      {s.duration_mins != null ? ` · ${s.duration_mins} min` : ''}
+                    </Text>
+                  </Pressable>
+                  <SessionRemoveIconButton
+                    iconColor={theme.textMuted}
+                    onPress={() =>
+                      onRemoveSession({
+                        id: s.id,
+                        title: s.title,
+                        scheduled_date: s.scheduled_date,
+                        status: s.status,
+                        completionStatus: s.completionStatus,
+                      })
+                    }
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Session details"
+                    hitSlop={8}
+                    onPress={() => router.push(`/SessionDetail?sessionId=${s.id}`)}>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                  </Pressable>
+                </View>
               ))}
             </View>
           ) : null}
@@ -539,11 +738,33 @@ function JournalDayDetailModal({
           {habits.length > 0 ? (
             <View style={styles.block}>
               <Text style={styles.blockTitle}>Habits</Text>
-              {habits.map((h) => (
-                <Text key={h.id} style={styles.line}>
-                  {habitIdsDone.has(h.id) ? '✓' : '○'} {h.icon_emoji} {h.name}
-                </Text>
-              ))}
+              <Text style={styles.detailHabitHint}>Tap to mark done for this day.</Text>
+              {habits.map((h) => {
+                const done = habitIdsDone.has(h.id);
+                const dates = habitStreakData?.habitCompletionByHabit.get(h.id) ?? new Set<string>();
+                const streak = calendarDayStreak(dates, iso);
+                const streakLabel = streak >= 3 ? `${streak} day streak` : null;
+                return (
+                  <Pressable
+                    key={h.id}
+                    onPress={() => onToggleDayHabit(h.id)}
+                    style={[
+                      styles.detailHabitCard,
+                      { backgroundColor: done ? withAlpha(theme.accent, 0.18) : withAlpha(theme.primary, 0.06) },
+                    ]}>
+                    <Text style={styles.detailHabitEmoji}>{h.icon_emoji}</Text>
+                    <View style={styles.detailHabitCopy}>
+                      <Text style={styles.detailHabitName}>{h.name}</Text>
+                      {streakLabel ? <Text style={styles.detailHabitStreak}>{streakLabel}</Text> : null}
+                    </View>
+                    <Ionicons
+                      name={done ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={22}
+                      color={done ? theme.accent : theme.textMuted}
+                    />
+                  </Pressable>
+                );
+              })}
             </View>
           ) : null}
 
@@ -594,6 +815,66 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
     streakBody: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: theme.text },
     streakEm: { fontFamily: 'DMSans_600SemiBold', color: theme.primary },
     streakFire: { fontFamily: 'DMSans_500Medium', fontSize: 13, color: theme.primary, marginTop: 8 },
+    todayCard: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: withAlpha(theme.primary, 0.12),
+      backgroundColor: theme.surface,
+      padding: 14,
+      marginTop: 12,
+      marginBottom: 4,
+    },
+    todayCardTitle: {
+      fontFamily: 'DMSans_600SemiBold',
+      fontSize: 13,
+      color: theme.text,
+      marginBottom: 10,
+    },
+    todayBlock: { marginBottom: 12 },
+    todayBlockLabel: {
+      fontFamily: 'DMSans_600SemiBold',
+      fontSize: 11,
+      letterSpacing: 0.5,
+      color: theme.accent,
+      marginBottom: 6,
+    },
+    todaySessionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 4,
+    },
+    todaySessionMainPressable: {
+      flex: 1,
+      minWidth: 0,
+    },
+    todaySessionText: {
+      flex: 1,
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 14,
+      color: theme.primary,
+    },
+    todayHabitHint: {
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 12,
+      color: theme.textMuted,
+      marginBottom: 8,
+    },
+    todayHabitCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: withAlpha(theme.primary, 0.08),
+    },
+    todayHabitEmoji: { fontSize: 22 },
+    todayHabitCopy: { flex: 1 },
+    todayHabitName: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.text },
+    todayHabitStreak: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted, marginTop: 2 },
     calendarCardWeb: {
       backgroundColor: theme.surface,
       borderRadius: 16,
@@ -739,7 +1020,8 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
       gap: 8,
       marginTop: 20,
       backgroundColor: theme.primary,
-      paddingVertical: 14,
+      paddingVertical: 18,
+      paddingHorizontal: 28,
       borderRadius: 999,
     },
     reflectCtaText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: theme.onPrimary },
@@ -803,8 +1085,43 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
     block: { marginBottom: 18 },
     blockTitle: { fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: theme.accent, marginBottom: 6 },
     line: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: theme.text, marginBottom: 4 },
-    sessionRowPressable: { paddingVertical: 2 },
-    sessionLine: { color: theme.primary },
+    sessionRowPressable: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 6,
+    },
+    sessionRowMainPressable: {
+      flex: 1,
+      minWidth: 0,
+    },
+    sessionLineText: {
+      flex: 1,
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 14,
+      color: theme.primary,
+    },
+    detailHabitHint: {
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 12,
+      color: theme.textMuted,
+      marginBottom: 8,
+    },
+    detailHabitCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: withAlpha(theme.primary, 0.08),
+    },
+    detailHabitEmoji: { fontSize: 22 },
+    detailHabitCopy: { flex: 1 },
+    detailHabitName: { fontFamily: 'DMSans_500Medium', fontSize: 14, color: theme.text },
+    detailHabitStreak: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: theme.textMuted, marginTop: 2 },
     metaLine: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: theme.textMuted, marginBottom: 8 },
     bodyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: theme.text, lineHeight: 22 },
     secondaryBtn: {

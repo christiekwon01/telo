@@ -38,6 +38,8 @@ import {
   getHuaweiIntegrationState,
 } from '@/services/huaweiHealthSync';
 import { AthleteLevel } from '@/store/onboarding-store';
+import { usePlanAdjustmentStore } from '@/store/plan-adjustment-store';
+import { useSessionStore } from '@/store/session-store';
 import { supabase } from '@/lib/supabase';
 
 type SportBackground = 'beginner' | 'experienced' | 'competitive';
@@ -78,6 +80,8 @@ export default function ProfileScreen() {
   const [isResettingTrainingData, setIsResettingTrainingData] = useState(false);
   /** Web: `window.confirm` is often blocked (iframe, embed, strict policies); use an in-app sheet instead. */
   const [resetTrainingConfirmOpen, setResetTrainingConfirmOpen] = useState(false);
+  /** Name/email are read-only until the user taps Logout (single-account flow). */
+  const [accountContactEditable, setAccountContactEditable] = useState(false);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const athleteLevel = (athlete?.level as AthleteLevel | undefined) ?? 'fara';
   const swimBackground = (athlete?.swim_background as SportBackground | undefined) ?? 'beginner';
@@ -111,6 +115,7 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadIntegrationPrefs();
+      return () => setAccountContactEditable(false);
     }, [loadIntegrationPrefs])
   );
 
@@ -236,6 +241,9 @@ export default function ProfileScreen() {
     try {
       await resetTrainingDataForAthlete(athlete.id);
 
+      useSessionStore.setState({ completedSessions: {}, sessionDrafts: {} });
+      usePlanAdjustmentStore.setState({ queue: [] });
+
       try {
         const keys = await AsyncStorage.getAllKeys();
         const weeklyKeys = keys.filter((k) => k.startsWith('weekly_intention:'));
@@ -252,8 +260,9 @@ export default function ProfileScreen() {
         /* ignore */
       }
 
+      await queryClient.resetQueries({ queryKey: sessionQueryKeys.all });
+
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: sessionQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: ['session_logs'] }),
         queryClient.invalidateQueries({ queryKey: ['plan'] }),
         queryClient.invalidateQueries({ queryKey: ['personal_bests'] }),
@@ -273,7 +282,7 @@ export default function ProfileScreen() {
   };
 
   const trainingDataResetExplanation =
-    'This permanently deletes all your planned and completed sessions, completion logs, step-by-step blocks, personal bests, Rova challenges, flex-week history, and locally saved weekly intentions. Your active plan row and goal races are not removed. This cannot be undone.';
+    'This permanently deletes all your planned and completed sessions, completion logs, step-by-step blocks, personal bests, Rova challenges, flex-week history, and locally saved weekly intentions. Plan and week views refresh so the calendar clears. Your active plan row and goal races are not removed. This cannot be undone.';
 
   const handleResetTrainingData = () => {
     if (isResettingTrainingData) return;
@@ -300,7 +309,11 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert('Single account mode', `Logout is temporarily disabled.\n\nThis app is currently locked to ${SINGLE_ACCOUNT_EMAIL}.`);
+    Alert.alert(
+      'Single account mode',
+      `Logout is temporarily disabled.\n\nThis app is currently locked to ${SINGLE_ACCOUNT_EMAIL}.\n\nYou can edit your name and email after you close this message.`,
+      [{ text: 'OK', onPress: () => setAccountContactEditable(true) }]
+    );
   };
 
   return (
@@ -314,24 +327,33 @@ export default function ProfileScreen() {
         <TabHeader title="Profile" />
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Account</Text>
+          {!accountContactEditable ? (
+            <Text style={styles.accountLockHint}>Tap Logout below to edit name and email.</Text>
+          ) : null}
           <View style={styles.inlineEditRow}>
             <View style={styles.inlineRow}>
               <Text style={styles.rowLabel}>Name</Text>
-              <TextInput
-                value={nameDraft}
-                onChangeText={setNameDraft}
-                selectTextOnFocus
-                onFocus={() => {
-                  if (accountFieldErrorField === 'name') {
-                    setAccountFieldErrorField(null);
-                    setAccountFieldError(null);
-                  }
-                }}
-                onBlur={() => void saveAccountField('name', nameDraft)}
-                placeholder="Your name"
-                placeholderTextColor={theme.textMuted}
-                style={styles.inlineInput}
-              />
+              {accountContactEditable ? (
+                <TextInput
+                  value={nameDraft}
+                  onChangeText={setNameDraft}
+                  selectTextOnFocus
+                  onFocus={() => {
+                    if (accountFieldErrorField === 'name') {
+                      setAccountFieldErrorField(null);
+                      setAccountFieldError(null);
+                    }
+                  }}
+                  onBlur={() => void saveAccountField('name', nameDraft)}
+                  placeholder="Your name"
+                  placeholderTextColor={theme.textMuted}
+                  style={styles.inlineInput}
+                />
+              ) : (
+                <Text style={styles.inlineLockedValue} numberOfLines={1}>
+                  {nameDraft.trim() ? nameDraft : '—'}
+                </Text>
+              )}
             </View>
             {savingAccountField === 'name' ? <Text style={styles.inlineHelperText}>Saving...</Text> : null}
             {accountFieldErrorField === 'name' && accountFieldError ? (
@@ -341,24 +363,30 @@ export default function ProfileScreen() {
           <View style={styles.inlineEditRow}>
             <View style={styles.inlineRow}>
               <Text style={styles.rowLabel}>Email</Text>
-              <TextInput
-                value={emailDraft}
-                onChangeText={setEmailDraft}
-                selectTextOnFocus
-                onFocus={() => {
-                  if (accountFieldErrorField === 'email') {
-                    setAccountFieldErrorField(null);
-                    setAccountFieldError(null);
-                  }
-                }}
-                onBlur={() => void saveAccountField('email', emailDraft)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="name@example.com"
-                placeholderTextColor={theme.textMuted}
-                style={styles.inlineInput}
-              />
+              {accountContactEditable ? (
+                <TextInput
+                  value={emailDraft}
+                  onChangeText={setEmailDraft}
+                  selectTextOnFocus
+                  onFocus={() => {
+                    if (accountFieldErrorField === 'email') {
+                      setAccountFieldErrorField(null);
+                      setAccountFieldError(null);
+                    }
+                  }}
+                  onBlur={() => void saveAccountField('email', emailDraft)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="name@example.com"
+                  placeholderTextColor={theme.textMuted}
+                  style={styles.inlineInput}
+                />
+              ) : (
+                <Text style={styles.inlineLockedValue} numberOfLines={1}>
+                  {emailDraft.trim() ? emailDraft : '—'}
+                </Text>
+              )}
             </View>
             {savingAccountField === 'email' ? <Text style={styles.inlineHelperText}>Saving...</Text> : null}
             {accountFieldErrorField === 'email' && accountFieldError ? (
@@ -635,6 +663,13 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     color: theme.textMuted,
     marginBottom: 10,
   },
+  accountLockHint: {
+    fontFamily: 'DMSans-Regular',
+    fontSize: 12,
+    color: theme.textMuted,
+    marginTop: -4,
+    marginBottom: 10,
+  },
   row: {
     minHeight: 42,
     flexDirection: 'row',
@@ -849,6 +884,15 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     fontSize: 13,
     color: theme.textMuted,
     textAlign: 'right',
+  },
+  inlineLockedValue: {
+    flex: 1,
+    minHeight: 32,
+    fontFamily: 'DMSans-Regular',
+    fontSize: 13,
+    color: theme.textMuted,
+    textAlign: 'right',
+    paddingTop: 6,
   },
   inlineEditRow: {
     minHeight: 42,

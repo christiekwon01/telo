@@ -37,10 +37,10 @@ export function WebSidebar({ pathname }: { pathname: string }) {
         <View style={styles.brandRow}>
           <Text style={[styles.brandText, { color: theme.onPrimary }]}>telo</Text>
           <View style={[styles.brandDot, { backgroundColor: theme.accent }]} />
+          <Text style={[styles.athleteName, { color: withAlpha(theme.onPrimary, 0.62) }]} numberOfLines={1}>
+            {athlete?.name ?? 'Athlete'}
+          </Text>
         </View>
-        <Text style={[styles.athleteName, { color: withAlpha(theme.onPrimary, 0.62) }]} numberOfLines={1}>
-          {athlete?.name ?? 'Athlete'}
-        </Text>
         <View style={styles.levelMetaRow}>
           <View style={[styles.levelBadge, { borderColor: theme.accent }]}>
             <Text style={[styles.levelBadgeText, { color: theme.accent }]}>{level[0].toUpperCase() + level.slice(1)}</Text>
@@ -105,7 +105,8 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+    minWidth: 0,
   },
   brandText: {
     fontFamily: 'CormorantGaramond_700Bold',
@@ -116,10 +117,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginTop: 8,
   },
   athleteName: {
-    marginTop: 8,
+    flex: 1,
+    minWidth: 0,
     fontFamily: 'DMSans_400Regular',
     fontSize: 13,
   },

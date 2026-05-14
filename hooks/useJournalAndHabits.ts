@@ -204,8 +204,8 @@ export function useUpsertReflectionMutation(athleteId: string | null | undefined
     mutationFn: async (payload: {
       entry_date: string;
       body_text: string;
-      mood: number;
-      energy: number;
+      mood: number | null;
+      energy: number | null;
       sleep_quality: number | null;
     }) => {
       if (!athleteId) throw new Error('No athlete');

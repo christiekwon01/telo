@@ -8,9 +8,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { FlexWeekSheet } from '@/components/FlexWeekSheet';
 import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { ImportPlanSheet } from '@/components/ImportPlanSheet';
+import { SessionRemoveIconButton } from '@/components/session-remove-icon-button';
 import { getSportIcon } from '@/components/sport-icon';
 import { SkeletonBlock } from '@/components/loading-ui';
 import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
+import { usePromptRemoveSession } from '@/hooks/usePromptRemoveSession';
 import { sessionQueryKeys, useActiveAthlete, useMonthSessions, useRaceGoals, useWeekSessions } from '@/hooks/useSessionData';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -29,7 +31,7 @@ import {
 } from '@/services/racePriority';
 import { usePlanAdjustmentStore } from '@/store/plan-adjustment-store';
 import { supabase } from '@/lib/supabase';
-import { datePickerMondayWeekProps, mondayBasedMonthLeadingDayCount, openWebDateInput } from '@/lib/dates';
+import { datePickerMondayWeekProps, mondayBasedMonthLeadingDayCount } from '@/lib/dates';
 
 type SessionStatus = 'planned' | 'completed' | 'skipped';
 type SessionDotStatus = 'planned' | 'completed';
@@ -238,11 +240,12 @@ type WeekSessionCardProps = {
   session: WeekSession;
   onPress: (sessionId: string) => void;
   onLongPress?: (sessionId: string) => void;
+  onRemovePress?: (session: WeekSession) => void;
   onDrop: (session: WeekSession, dropY: number) => void;
   onDragStateChange: (isDragging: boolean) => void;
 };
 
-function WeekSessionCard({ session, onPress, onLongPress, onDrop, onDragStateChange }: WeekSessionCardProps) {
+function WeekSessionCard({ session, onPress, onLongPress, onRemovePress, onDrop, onDragStateChange }: WeekSessionCardProps) {
   const { theme } = useTheme();
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -321,68 +324,88 @@ function WeekSessionCard({ session, onPress, onLongPress, onDrop, onDragStateCha
         isActiveDrag ? styles.weekSessionCardDragging : null,
       ]}
       {...panHandlers}>
-      <Pressable
-        style={styles.weekSessionPressable}
-        onPressIn={() => {
-          if (isWeb && canDrag) {
+      <View style={styles.weekSessionCardInner}>
+        <Pressable
+          style={styles.weekSessionPressableMain}
+          onPressIn={() => {
+            if (isWeb && canDrag) {
+              setIsDragPrimed(true);
+            }
+          }}
+          onPressOut={() => {
+            if (isWeb && !isActiveDrag) {
+              setIsDragPrimed(false);
+            }
+          }}
+          onPress={() => {
+            if (isActiveDrag || isDragPrimed || suppressPressRef.current) return;
+            if (session.id) {
+              onPress(session.id);
+            }
+          }}
+          onLongPress={() => {
+            if (!canDrag) {
+              if (session.id) onLongPress?.(session.id);
+              return;
+            }
             setIsDragPrimed(true);
-          }
-        }}
-        onPressOut={() => {
-          if (isWeb && !isActiveDrag) {
-            setIsDragPrimed(false);
-          }
-        }}
-        onPress={() => {
-          if (isActiveDrag || isDragPrimed || suppressPressRef.current) return;
-          if (session.id) {
-            onPress(session.id);
-          }
-        }}
-        onLongPress={() => {
-          if (!canDrag) {
-            if (session.id) onLongPress?.(session.id);
-            return;
-          }
-          setIsDragPrimed(true);
-          suppressPressRef.current = true;
-          setTimeout(() => {
-            suppressPressRef.current = false;
-          }, 260);
-        }}>
-        {completed ? (
-          <View style={styles.weekSessionCheckCol}>
-            <View style={[styles.weekSessionCheckBubble, { backgroundColor: theme.accent }]}>
-              <Ionicons name="checkmark" size={14} color={theme.surface} />
+            suppressPressRef.current = true;
+            setTimeout(() => {
+              suppressPressRef.current = false;
+            }, 260);
+          }}>
+          {completed ? (
+            <View style={styles.weekSessionCheckCol}>
+              <View style={[styles.weekSessionCheckBubble, { backgroundColor: theme.accent }]}>
+                <Ionicons name="checkmark" size={14} color={theme.surface} />
+              </View>
             </View>
+          ) : null}
+          <View style={[styles.weekSessionIconWrap, { backgroundColor: theme.primary }]}>
+            {getSportIcon(session.sport, 16, theme.surface)}
+            <View style={[styles.weekSessionIconAccentDot, { backgroundColor: theme.accent }]} />
           </View>
-        ) : null}
-        <View style={[styles.weekSessionIconWrap, { backgroundColor: theme.primary }]}>
-          {getSportIcon(session.sport, 16, theme.surface)}
-          <View style={[styles.weekSessionIconAccentDot, { backgroundColor: theme.accent }]} />
+          <View style={styles.weekSessionCopy}>
+            <Text
+              style={[
+                styles.weekSessionTitle,
+                { color: completed ? withAlpha(theme.text, 0.72) : theme.text },
+              ]}
+              numberOfLines={1}>
+              {session.title}
+            </Text>
+            <Text style={[styles.weekSessionMeta, { color: theme.textMuted }]} numberOfLines={1}>
+              {formatWeekSessionSubtitle(session)}
+              {completed ? (
+                <>
+                  {' · '}
+                  <Text style={{ color: theme.accent }}>Completed</Text>
+                </>
+              ) : null}
+            </Text>
+          </View>
+        </Pressable>
+        <View style={styles.weekSessionTrailing}>
+          {onRemovePress && session.id ? (
+            <SessionRemoveIconButton
+              iconColor={withAlpha(theme.primary, 0.45)}
+              onPress={() => onRemovePress(session)}
+            />
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Session details"
+            hitSlop={10}
+            style={styles.weekSessionChevronHit}
+            onPress={() => {
+              if (isActiveDrag || suppressPressRef.current) return;
+              if (session.id) onPress(session.id);
+            }}>
+            <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.2)} />
+          </Pressable>
+          {canDrag ? <DragHandleAffordance /> : null}
         </View>
-        <View style={styles.weekSessionCopy}>
-          <Text
-            style={[
-              styles.weekSessionTitle,
-              { color: completed ? withAlpha(theme.text, 0.72) : theme.text },
-            ]}
-            numberOfLines={1}>
-            {session.title}
-          </Text>
-          <Text style={[styles.weekSessionMeta, { color: theme.textMuted }]} numberOfLines={1}>
-            {formatWeekSessionSubtitle(session)}
-            {completed ? (
-              <>
-                {' · '}
-                <Text style={{ color: theme.accent }}>Completed</Text>
-              </>
-            ) : null}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.2)} />
-        {canDrag ? <DragHandleAffordance /> : null}
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }
@@ -573,16 +596,6 @@ export default function PlanScreen() {
   };
 
   const openWeekPicker = () => {
-    if (
-      openWebDateInput(toIsoDate(weekStart), (isoDate) => {
-        const [y, m, d] = isoDate.split('-').map(Number);
-        const selected = new Date(y, m - 1, d);
-        setWeekPickerDate(selected);
-        applyWeekPickerDate(selected);
-      })
-    ) {
-      return;
-    }
     setWeekPickerDate(new Date(weekStart));
     setWeekPickerOpen(true);
   };
@@ -660,6 +673,11 @@ export default function PlanScreen() {
       });
     }
   };
+
+  const { promptRemoveSession } = usePromptRemoveSession(athlete?.id, (message) => {
+    setWeekError(null);
+    showFeedback(message);
+  });
 
   const handleSessionDrop = async (session: WeekSession, dropY: number) => {
     const moveStatus = session.completionStatus ?? session.status;
@@ -993,8 +1011,15 @@ export default function PlanScreen() {
                 <Pressable hitSlop={10} onPress={goPrevWeek} style={[styles.weekNavBtn, themed.weekNavBtn]}>
                   <Ionicons name="chevron-back" size={14} color={theme.primary} />
                 </Pressable>
-                <Pressable hitSlop={12} onPress={openWeekPicker} style={styles.weekNavLabelButton}>
-                  <Text style={[styles.weekNavLabel, themed.subtleText]}>{weekRangeLabel}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose week"
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                  onPress={openWeekPicker}
+                  style={({ pressed }) => [styles.weekNavLabelButton, pressed && styles.weekNavLabelButtonPressed]}>
+                  <Text selectable={false} style={[styles.weekNavLabel, themed.subtleText]}>
+                    {weekRangeLabel}
+                  </Text>
                 </Pressable>
                 <Pressable hitSlop={10} onPress={goNextWeek} style={[styles.weekNavBtn, themed.weekNavBtn]}>
                   <Ionicons name="chevron-forward" size={14} color={theme.primary} />
@@ -1079,6 +1104,7 @@ export default function PlanScreen() {
                         session={session}
                         onPress={(sessionId) => router.push(`/SessionDetail?sessionId=${sessionId}`)}
                         onLongPress={(sessionId) => openImportSheet({ mode: 'manual', sessionId })}
+                        onRemovePress={promptRemoveSession}
                         onDrop={handleSessionDrop}
                         onDragStateChange={(dragging) => {
                           setIsDragging(dragging);
@@ -1114,40 +1140,56 @@ export default function PlanScreen() {
                 {selectedDateSessions.map((session) => {
                   const completed = (session.completionStatus ?? session.status) === 'completed';
                   return (
-                    <Pressable
+                    <View
                       key={session.id}
                       style={[
                         styles.selectedSessionItem,
                         themed.selectedSessionItem,
                         completed ? { borderColor: withAlpha(theme.accent, 0.55) } : null,
-                      ]}
-                      onPress={() => router.push(`/SessionDetail?sessionId=${session.id}`)}
-                      onLongPress={() => openImportSheet({ mode: 'manual', sessionId: session.id })}>
-                      {completed ? (
-                        <View style={styles.weekSessionCheckCol}>
-                          <View style={[styles.weekSessionCheckBubble, { backgroundColor: theme.accent }]}>
-                            <Ionicons name="checkmark" size={14} color={theme.surface} />
+                      ]}>
+                      <Pressable
+                        style={styles.selectedSessionPressable}
+                        onPress={() => router.push(`/SessionDetail?sessionId=${session.id}`)}
+                        onLongPress={() => openImportSheet({ mode: 'manual', sessionId: session.id })}>
+                        {completed ? (
+                          <View style={styles.weekSessionCheckCol}>
+                            <View style={[styles.weekSessionCheckBubble, { backgroundColor: theme.accent }]}>
+                              <Ionicons name="checkmark" size={14} color={theme.surface} />
+                            </View>
                           </View>
+                        ) : null}
+                        <View style={[styles.weekSessionIconWrap, { backgroundColor: theme.primary }]}>
+                          {getSportIcon(session.sport, 16, theme.surface)}
                         </View>
-                      ) : null}
-                      <View style={[styles.weekSessionIconWrap, { backgroundColor: theme.primary }]}>
-                        {getSportIcon(session.sport, 16, theme.surface)}
+                        <View style={styles.selectedSessionCopy}>
+                          <Text style={[styles.selectedSessionTitle, themed.cardText]}>{session.title}</Text>
+                          <Text style={[styles.selectedSessionMeta, themed.subtleText]} numberOfLines={1}>
+                            {session.duration_mins ?? '-'} min
+                            {session.distance ? ` · ${session.distance}${session.distance_unit ?? ''}` : ''}
+                            {completed ? (
+                              <>
+                                {' · '}
+                                <Text style={{ color: theme.accent }}>Completed</Text>
+                              </>
+                            ) : null}
+                          </Text>
+                        </View>
+                      </Pressable>
+                      <View style={styles.weekSessionTrailing}>
+                        <SessionRemoveIconButton
+                          iconColor={withAlpha(theme.primary, 0.45)}
+                          onPress={() => promptRemoveSession(session)}
+                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Session details"
+                          hitSlop={10}
+                          style={styles.weekSessionChevronHit}
+                          onPress={() => router.push(`/SessionDetail?sessionId=${session.id}`)}>
+                          <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.2)} />
+                        </Pressable>
                       </View>
-                      <View style={styles.selectedSessionCopy}>
-                        <Text style={[styles.selectedSessionTitle, themed.cardText]}>{session.title}</Text>
-                        <Text style={[styles.selectedSessionMeta, themed.subtleText]} numberOfLines={1}>
-                          {session.duration_mins ?? '-'} min
-                          {session.distance ? ` · ${session.distance}${session.distance_unit ?? ''}` : ''}
-                          {completed ? (
-                            <>
-                              {' · '}
-                              <Text style={{ color: theme.accent }}>Completed</Text>
-                            </>
-                          ) : null}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.2)} />
-                    </Pressable>
+                    </View>
                   );
                 })}
               </View>
@@ -1621,14 +1663,24 @@ const styles = StyleSheet.create({
   },
   selectedSessionItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(15,40,64,0.1)',
     backgroundColor: '#F6F3EE',
-    paddingHorizontal: 10,
+    paddingVertical: 0,
+    paddingLeft: 10,
+    paddingRight: 4,
+    gap: 0,
+    overflow: 'hidden',
+  },
+  selectedSessionPressable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 10,
     gap: 10,
+    minWidth: 0,
   },
   selectedSessionCopy: {
     flex: 1,
@@ -1686,11 +1738,23 @@ const styles = StyleSheet.create({
     color: 'rgba(15,40,64,0.55)',
   },
   weekNavLabelButton: {
-    minHeight: 28,
+    minHeight: 32,
     minWidth: 170,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
+    ...Platform.select({
+      web: {
+        cursor: 'pointer' as const,
+        userSelect: 'none' as const,
+      },
+      default: {},
+    }),
+  },
+  weekNavLabelButtonPressed: {
+    opacity: 0.75,
   },
   weekPickerBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -1840,6 +1904,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#C97E2F',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  weekSessionCardInner: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  weekSessionPressableMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    minWidth: 0,
+  },
+  weekSessionTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 6,
+    gap: 0,
+  },
+  weekSessionChevronHit: {
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingLeft: 2,
   },
   weekSessionPressable: {
     flexDirection: 'row',

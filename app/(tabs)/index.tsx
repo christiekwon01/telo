@@ -24,10 +24,12 @@ import { FloatingPillNav } from '@/components/floating-pill-nav';
 import { DailyReflectionSheet } from '@/components/DailyReflectionSheet';
 import { SkeletonBlock } from '@/components/loading-ui';
 import { getSportIcon } from '@/components/sport-icon';
+import { SessionRemoveIconButton } from '@/components/session-remove-icon-button';
 import { TabHeader, TAB_SCREEN_CONTENT_PADDING_TOP, TAB_SCREEN_PADDING_HORIZONTAL } from '@/components/tab-header';
 import { useTheme } from '@/contexts/ThemeContext';
 import { journalQueryKeys } from '@/hooks/useJournalAndHabits';
 import { useScrollToTopTabRef } from '@/hooks/useScrollToTopTabRef';
+import { usePromptRemoveSession } from '@/hooks/usePromptRemoveSession';
 import { useActiveAthlete, useLevelProgress, useRaceGoals, useUpcomingSessions, useTodaysSessions, useWeekSessions } from '@/hooks/useSessionData';
 import { useWeeklyChallenges } from '@/hooks/useWeeklyChallenges';
 import { isAnthropicEnabled } from '@/lib/anthropic';
@@ -111,6 +113,7 @@ export default function HomeScreen() {
   const { data: raceGoals = [] } = useRaceGoals(athlete?.id);
   const levelProgress = useLevelProgress(athlete?.id, athlete?.level);
   const queryClient = useQueryClient();
+  const { promptRemoveSession } = usePromptRemoveSession(athlete?.id);
   const athleteLevel = levelProgress.currentLevel;
   const nextLevel = levelProgress.nextLevel;
   const atPeakTier = levelProgress.atPeakTier;
@@ -309,7 +312,7 @@ export default function HomeScreen() {
   type UpcomingCard = Pick<
     (typeof todaySessionCards)[number],
     'id' | 'sport' | 'title' | 'meta' | 'status' | 'completedAt'
-  >;
+  > & { scheduled_date: string };
 
   const nextUpcomingSessions = useMemo(
     () =>
@@ -344,6 +347,7 @@ export default function HomeScreen() {
         id: session.id,
         sport: session.sport,
         title: session.title,
+        scheduled_date: key,
         meta: `${session.sport.toUpperCase()} · ${session.duration_mins ?? '-'} min · ${
           session.distance ?? '-'
         }${session.distance_unit ?? ''} · ${session.intensity ?? 'Steady'}`,
@@ -682,44 +686,65 @@ export default function HomeScreen() {
             <View key={group.date} style={styles.upcomingGroup}>
               <Text style={[styles.upcomingDateLabel, { color: withAlpha(theme.primary, 0.5) }]}>{group.label}</Text>
               {group.sessions.map((session) => (
-                <Pressable
-                  key={session.id}
-                  style={[styles.workoutCard, themeStyles.cardSurface]}
-                  onPress={() => router.push(`/SessionDetail?sessionId=${session.id}`)}>
-                  <View style={[styles.workoutIconWrap, themeStyles.iconWrap]}>
-                    {session.status === 'completed' ? (
-                      <View style={[styles.cardDoneBadge, themeStyles.cardDoneBadge]}>
-                        <Ionicons name="checkmark" size={9} color={theme.onAccent} />
-                      </View>
-                    ) : null}
-                    {getSportIcon(session.sport, 16, theme.surface)}
-                    <View style={[styles.iconAccentDot, themeStyles.accentDot]} />
-                  </View>
-                  <View style={styles.workoutTextWrap}>
-                    <Text
-                      style={[
-                        styles.workoutTitle,
-                        themeStyles.cardText,
-                        session.status === 'completed' ? styles.workoutTitleDone : null,
-                      ]}>
-                      {session.title}
-                    </Text>
-                    {session.status === 'completed' ? (
-                      <Text style={[styles.workoutSubtitleDone, themeStyles.accentText]}>
-                        Completed ·{' '}
-                        {new Date(
-                          session.completedAt ?? new Date().toISOString()
-                        ).toLocaleTimeString('en-AU', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                <View key={session.id} style={[styles.workoutCard, themeStyles.cardSurface]}>
+                  <Pressable
+                    style={styles.workoutCardMain}
+                    onPress={() => router.push(`/SessionDetail?sessionId=${session.id}`)}>
+                    <View style={[styles.workoutIconWrap, themeStyles.iconWrap]}>
+                      {session.status === 'completed' ? (
+                        <View style={[styles.cardDoneBadge, themeStyles.cardDoneBadge]}>
+                          <Ionicons name="checkmark" size={9} color={theme.onAccent} />
+                        </View>
+                      ) : null}
+                      {getSportIcon(session.sport, 16, theme.surface)}
+                      <View style={[styles.iconAccentDot, themeStyles.accentDot]} />
+                    </View>
+                    <View style={styles.workoutTextWrap}>
+                      <Text
+                        style={[
+                          styles.workoutTitle,
+                          themeStyles.cardText,
+                          session.status === 'completed' ? styles.workoutTitleDone : null,
+                        ]}>
+                        {session.title}
                       </Text>
-                    ) : (
-                      <Text style={[styles.workoutSubtitle, themeStyles.mutedText]}>{session.meta}</Text>
-                    )}
+                      {session.status === 'completed' ? (
+                        <Text style={[styles.workoutSubtitleDone, themeStyles.accentText]}>
+                          Completed ·{' '}
+                          {new Date(
+                            session.completedAt ?? new Date().toISOString()
+                          ).toLocaleTimeString('en-AU', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.workoutSubtitle, themeStyles.mutedText]}>{session.meta}</Text>
+                      )}
+                    </View>
+                  </Pressable>
+                  <View style={styles.workoutCardTrailing}>
+                    <SessionRemoveIconButton
+                      iconColor={withAlpha(theme.primary, 0.42)}
+                      onPress={() =>
+                        promptRemoveSession({
+                          id: session.id,
+                          title: session.title,
+                          scheduled_date: session.scheduled_date,
+                          status: session.status === 'completed' ? 'completed' : 'planned',
+                          completionStatus: session.status,
+                        })
+                      }
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Session details"
+                      hitSlop={8}
+                      onPress={() => router.push(`/SessionDetail?sessionId=${session.id}`)}>
+                      <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.2)} />
+                    </Pressable>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={withAlpha(theme.primary, 0.2)} />
-                </Pressable>
+                </View>
               ))}
             </View>
           ))}
@@ -1159,7 +1184,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: 'rgba(15,40,64,0.1)',
-    padding: 12,
+    paddingVertical: 12,
+    paddingLeft: 12,
+    paddingRight: 8,
+  },
+  workoutCardMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  workoutCardTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   workoutIconWrap: {
     width: 36,
