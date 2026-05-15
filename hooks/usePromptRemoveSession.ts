@@ -33,10 +33,12 @@ export function usePromptRemoveSession(athleteId: string | undefined, onSuccess?
           ToastAndroid.show('Session removed', ToastAndroid.SHORT);
         }
       } catch (error) {
-        Alert.alert(
-          'Could not remove session',
-          error instanceof Error && error.message.trim().length > 0 ? error.message : 'Unknown error'
-        );
+        const msg = error instanceof Error && error.message.trim().length > 0 ? error.message : 'Unknown error';
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.alert(`Could not remove session\n\n${msg}`);
+        } else {
+          Alert.alert('Could not remove session', msg);
+        }
       }
     },
     [athleteId, onSuccess, queryClient]
@@ -44,9 +46,29 @@ export function usePromptRemoveSession(athleteId: string | undefined, onSuccess?
 
   const promptRemoveSession = useCallback(
     (session: RemovableSession) => {
-      if (!athleteId || !session.id) return;
+      if (!session.id) return;
+      if (!athleteId) {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.alert('Your athlete profile is still loading. Try again in a moment.');
+        } else {
+          Alert.alert('Could not remove', 'Your athlete profile is still loading. Try again in a moment.');
+        }
+        return;
+      }
       const completed = (session.completionStatus ?? session.status) === 'completed';
       const label = session.title?.trim() || 'This session';
+
+      // RN Web's Alert is unreliable in some browsers/embeds; use the native confirm dialog on web.
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+        const message = completed
+          ? `Delete completed session?\n\n${label} will be removed from your plan and history.`
+          : `Remove session?\n\n${label} will be removed from your plan.`;
+        if (window.confirm(message)) {
+          void executeRemove(session);
+        }
+        return;
+      }
+
       if (completed) {
         Alert.alert('Delete completed session?', `${label} will be removed from your plan and history.`, [
           { text: 'Cancel', style: 'cancel' },

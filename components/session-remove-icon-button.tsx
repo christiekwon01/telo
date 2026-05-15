@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 type SessionRemoveIconButtonProps = {
   onPress: () => void;
@@ -25,9 +25,11 @@ export function SessionRemoveIconButton({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         hitSlop={10}
-        style={styles.pressable}
+        style={[styles.pressable, styles.pressableWeb]}
         onPress={onPress}>
-        <Ionicons name="close" size={size} color={iconColor} />
+        <View pointerEvents="none" style={styles.iconSlot}>
+          <Ionicons name="close" size={size} color={iconColor} />
+        </View>
       </Pressable>
     </View>
   );
@@ -42,6 +44,17 @@ const styles = StyleSheet.create({
     minWidth: 26,
     minHeight: 26,
     borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressableWeb: Platform.select({
+    web: {
+      cursor: 'pointer' as const,
+      userSelect: 'none' as const,
+    },
+    default: {},
+  }),
+  iconSlot: {
     alignItems: 'center',
     justifyContent: 'center',
   },
